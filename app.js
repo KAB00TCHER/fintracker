@@ -412,6 +412,59 @@ function setupEvents() {
   );
 
 
+  $("#quick-expenses")?.addEventListener(
+  "click",
+  event => {
+
+    const button =
+      event.target.closest(
+        "[data-quick-expense-merchant]"
+      );
+
+    if (!button) {
+      return;
+    }
+
+    const merchant =
+      button.dataset
+        .quickExpenseMerchant;
+
+    const categoryId =
+      button.dataset
+        .quickExpenseCategory;
+
+    openTransactionModal(
+      "expense"
+    );
+
+    setTimeout(() => {
+
+      setValue(
+        "#transaction-merchant",
+        merchant
+      );
+
+      setValue(
+        "#transaction-category",
+        categoryId
+      );
+
+      handleMainCategoryChange(
+        categoryId
+      );
+
+      setTimeout(() => {
+
+        $("#transaction-amount")
+          ?.focus();
+
+      }, 50);
+
+    }, 80);
+  }
+);
+
+
   $("#transactions-add")?.addEventListener(
     "click",
     () => {
@@ -1494,14 +1547,153 @@ if (remainingCard) {
 }
 
   renderCategoryOverview(
-    monthTransactions
-  );
+  monthTransactions
+);
 
-  renderRecentTransactions();
+renderQuickExpenses();
 
-  renderInsights();
+renderRecentTransactions();
+
+renderInsights();
 }
 
+function renderQuickExpenses() {
+
+  const container =
+    $("#quick-expenses");
+
+  if (!container) {
+    return;
+  }
+
+  const expenses =
+    state.transactions
+      .filter(
+        transaction =>
+          transaction.type === "expense"
+      );
+
+  if (!expenses.length) {
+
+    container.innerHTML = `
+      <div class="quick-expenses-empty">
+        Добавьте несколько расходов,
+        и здесь появятся быстрые действия.
+      </div>
+    `;
+
+    return;
+  }
+
+  const combinations =
+    new Map();
+
+  expenses.forEach(transaction => {
+
+    const merchant =
+      (
+        transaction.merchant ||
+        ""
+      ).trim();
+
+    const category =
+      getCategory(
+        transaction.category_id
+      );
+
+    if (
+      !merchant ||
+      !category ||
+      category.parent_id !== null
+    ) {
+      return;
+    }
+
+    const key =
+      `${merchant}::${category.id}`;
+
+    if (!combinations.has(key)) {
+
+      combinations.set(
+        key,
+        {
+          merchant,
+          categoryId: category.id,
+          categoryName: category.name,
+          count: 0
+        }
+      );
+    }
+
+    combinations.get(key).count++;
+  });
+
+  const items =
+    [...combinations.values()]
+      .sort(
+        (a, b) =>
+          b.count - a.count
+      )
+      .slice(0, 6);
+
+  if (!items.length) {
+
+    container.innerHTML = `
+      <div class="quick-expenses-empty">
+        Быстрые расходы появятся
+        после нескольких операций.
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    items
+      .map(item => {
+
+        return `
+          <button
+            type="button"
+            class="quick-expense-card"
+            data-quick-expense-merchant="${escapeHtml(
+              item.merchant
+            )}"
+            data-quick-expense-category="${escapeHtml(
+              item.categoryId
+            )}"
+          >
+
+            <span class="quick-expense-icon">
+              ${getTransactionIcon({
+                type: "expense",
+                category_id:
+                  item.categoryId
+              })}
+            </span>
+
+            <span class="quick-expense-text">
+
+              <strong>
+                ${escapeHtml(
+                  item.merchant
+                )}
+              </strong>
+
+              <small>
+                ${escapeHtml(
+                  item.categoryName
+                )}
+              </small>
+
+            </span>
+
+          </button>
+        `;
+
+      })
+      .join("");
+}
 
 async function calculateAllTimeBalance() {
   const transactions =
@@ -1747,7 +1939,11 @@ function getTransactionIcon(transaction) {
   if (
     transaction.type === "income"
   ) {
-    return "↗";
+    return `
+      <span class="transaction-symbol income-symbol">
+        ↑
+      </span>
+    `;
   }
 
   const category =
@@ -1764,7 +1960,11 @@ function getTransactionIcon(transaction) {
     name.includes("еда") ||
     name.includes("магазин")
   ) {
-    return "🛒";
+    return `
+      <span class="transaction-symbol">
+        ◫
+      </span>
+    `;
   }
 
   if (
@@ -1772,7 +1972,11 @@ function getTransactionIcon(transaction) {
     name.includes("такси") ||
     name.includes("авто")
   ) {
-    return "↗";
+    return `
+      <span class="transaction-symbol">
+        ⇢
+      </span>
+    `;
   }
 
   if (
@@ -1780,36 +1984,60 @@ function getTransactionIcon(transaction) {
     name.includes("квартир") ||
     name.includes("дом")
   ) {
-    return "⌂";
+    return `
+      <span class="transaction-symbol">
+        ⌂
+      </span>
+    `;
   }
 
   if (
     name.includes("одежд")
   ) {
-    return "◇";
+    return `
+      <span class="transaction-symbol">
+        ◇
+      </span>
+    `;
   }
 
   if (
     name.includes("здоров") ||
     name.includes("медицин")
   ) {
-    return "+";
+    return `
+      <span class="transaction-symbol">
+        +
+      </span>
+    `;
   }
 
   if (
     name.includes("развлеч") ||
     name.includes("игр")
   ) {
-    return "◈";
+    return `
+      <span class="transaction-symbol">
+        ◆
+      </span>
+    `;
   }
 
   if (
     name.includes("подпис")
   ) {
-    return "◌";
+    return `
+      <span class="transaction-symbol">
+        ◌
+      </span>
+    `;
   }
 
-  return "−";
+  return `
+    <span class="transaction-symbol">
+      −
+    </span>
+  `;
 }
 
 
@@ -1859,7 +2087,7 @@ function renderTransactionRow(
   }"
   aria-hidden="true"
 >
-  ${ICONS[transaction.type] || "•"}
+  ${getTransactionIcon(transaction)}
 </div>
 
       <div class="transaction-content">
@@ -1881,14 +2109,15 @@ function renderTransactionRow(
       </div>
 
       <div
-        class="transaction-amount ${
-          isIncome
-            ? "income"
-            : "expense"
-        }"
-      >
-        ${sign}${money(amount)}
-      </div>
+  class="transaction-icon ${
+    isIncome
+      ? "income"
+      : "expense"
+  }"
+  aria-hidden="true"
+>
+  ${getTransactionIcon(transaction)}
+</div>
 
       <div class="transaction-actions">
 
