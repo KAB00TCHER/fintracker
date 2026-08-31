@@ -379,7 +379,16 @@ function setupEvents() {
       await supabaseClient.auth.signOut();
     }
   );
+  $("#transaction-category")?.addEventListener(
+  "change",
+  event => {
 
+    renderTransactionCategoryChips(
+      event.target.value
+    );
+
+  }
+);
 
   /* -----------------------------------------
      NAVIGATION
@@ -434,7 +443,16 @@ function setupEvents() {
     }
   );
 
+  $("#quick-add-category")?.addEventListener(
+  "click",
+  openQuickCategoryModal
+);
 
+
+$("#quick-category-form")?.addEventListener(
+  "submit",
+  addQuickCategory
+);
   /* -----------------------------------------
      USER MENU
   ----------------------------------------- */
@@ -540,6 +558,15 @@ function setupEvents() {
     "submit",
     saveTransaction
   );
+
+  $("#transaction-category")?.addEventListener(
+  "change",
+  event => {
+    renderTransactionCategoryChips(
+      event.target.value
+    );
+  }
+);
 
 
   $("#add-item-button")?.addEventListener(
@@ -1657,28 +1684,162 @@ function openTransactionModal(
     transaction;
 
 
-  resetTransactionForm();
+  /*
+    Сначала очищаем форму.
+  */
+
+  setValue(
+    "#transaction-id",
+    transaction?.id || ""
+  );
+
+  setValue(
+    "#transaction-amount",
+    transaction?.amount || ""
+  );
+
+  setValue(
+    "#transaction-date",
+    transaction?.date ||
+      new Date()
+        .toISOString()
+        .slice(0, 10)
+  );
+
+  setValue(
+    "#transaction-merchant",
+    transaction?.merchant?.name ||
+      transaction?.merchant_name ||
+      ""
+  );
+
+  setValue(
+    "#transaction-note",
+    transaction?.note ||
+      transaction?.description ||
+      ""
+  );
 
 
-  if (transaction) {
-    fillTransactionForm(
-      transaction
-    );
-  } else {
+  /*
+    Устанавливаем тип операции.
+    Это также обновляет видимость
+    expense-only элементов.
+  */
 
-    setTransactionType(type);
+  setTransactionType(type);
+
+
+  /*
+    Заполняем категории именно
+    для выбранного типа операции.
+  */
+
+  populateTransactionCategories(
+    transaction?.category_id || null
+  );
+
+
+  /*
+    Если редактируем существующую
+    операцию — выбираем её категорию.
+  */
+
+  if (transaction?.category_id) {
 
     setValue(
-      "#transaction-date",
-      transactionDateForNewTransaction()
+      "#transaction-category",
+      transaction.category_id
     );
+
+    renderTransactionCategoryChips(
+      transaction.category_id
+    );
+  }
+
+
+  /*
+    Заголовок.
+  */
+
+  setText(
+    "#transaction-modal-title",
+    transaction
+      ? "Редактировать"
+      : type === "income"
+        ? "Доход"
+        : "Расход"
+  );
+
+
+  setText(
+    "#transaction-modal-eyebrow",
+    transaction
+      ? "Редактирование"
+      : "Новая операция"
+  );
+
+
+  /*
+    Сбрасываем детализацию.
+  */
+
+  const items =
+    $("#transaction-items");
+
+  if (items) {
+    items.innerHTML = "";
+  }
+
+
+  /*
+    Если редактируем транзакцию
+    с детализацией — восстанавливаем
+    строки.
+  */
+
+  if (
+    transaction?.transaction_items &&
+    transaction.transaction_items.length
+  ) {
+
+    transaction.transaction_items
+      .forEach(item => {
+
+        addItemRow(item);
+
+      });
 
   }
 
 
+  updateItemsTotal();
+
+
+  /*
+    Открываем окно.
+  */
+
   openModal(
     "transaction-modal"
   );
+
+
+  /*
+    На телефоне сразу ставим
+    курсор в сумму.
+  */
+
+  setTimeout(() => {
+
+    const amount =
+      $("#transaction-amount");
+
+    if (amount) {
+      amount.focus();
+    }
+
+  }, 120);
 }
 
 
@@ -1850,6 +2011,9 @@ function setTransactionType(type) {
       ? "Доход"
       : "Расход"
   );
+
+
+  populateTransactionCategories();
 }
 
 
@@ -2648,7 +2812,132 @@ function populateBudgetCategories() {
       }
     );
 }
+/* =========================================================
+   QUICK CATEGORY FROM TRANSACTION
+========================================================= */
 
+function openQuickCategoryModal() {
+
+  const input = $("#quick-category-name");
+
+  if (input) {
+    input.value = "";
+  }
+
+  openModal("quick-category-modal");
+
+  setTimeout(() => {
+    input?.focus();
+  }, 100);
+}
+
+
+async function addQuickCategory(event) {
+
+  event.preventDefault();
+
+  const input =
+    $("#quick-category-name");
+
+  const name =
+    input?.value.trim();
+
+  if (!name) {
+    return;
+  }
+
+
+  const type =
+    state.transactionType === "income"
+      ? "income"
+      : "expense";
+
+
+  try {
+
+    const {
+      data,
+      error
+    } = await supabaseClient
+      .from("categories")
+      .insert({
+        name,
+        type
+      })
+      .select()
+      .single();
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    /*
+      Обновляем локальный справочник.
+    */
+
+    await loadReferenceData();
+
+
+    /*
+      Находим созданную категорию.
+      Используем id из ответа, если он есть.
+    */
+
+    const newCategory =
+      data ||
+      state.categories.find(
+        category =>
+          category.name === name &&
+          category.type === type
+      );
+
+
+    /*
+      Перерисовываем категории
+      в форме операции.
+    */
+
+    populateTransactionCategories();
+
+
+    /*
+      Сразу выбираем новую категорию.
+    */
+
+    if (newCategory) {
+
+      setValue(
+        "#transaction-category",
+        newCategory.id
+      );
+
+      renderTransactionCategoryChips(
+        newCategory.id
+      );
+    }
+
+
+    closeModal(
+      "quick-category-modal"
+    );
+
+
+    showToast(
+      "Категория добавлена."
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+  }
+}
 
 async function addCategory(event) {
   event.preventDefault();

@@ -974,53 +974,333 @@
 
   </section>
 
+<!-- =====================================================
+     TRANSACTION MODAL
+====================================================== -->
 
-  <!-- =====================================================
-       TRANSACTION MODAL
-  ====================================================== -->
+<div
+  id="transaction-modal"
+  class="modal hidden"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="transaction-modal-title"
+>
 
-  <div
-    id="transaction-modal"
-    class="modal hidden"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="transaction-modal-title"
-  >
+  <div class="modal-backdrop"></div>
 
-    <div class="modal-backdrop"></div>
+  <div class="modal-card transaction-modal-card">
+
+    <div class="modal-header">
+
+      <div>
+        <p
+          class="eyebrow"
+          id="transaction-modal-eyebrow"
+        >
+          Новая операция
+        </p>
+
+        <h2 id="transaction-modal-title">
+          Расход
+        </h2>
+      </div>
+
+      <button
+        class="close-button"
+        data-close-modal="transaction-modal"
+        type="button"
+        aria-label="Закрыть"
+      >
+        ×
+      </button>
+
+    </div>
 
 
-    <div class="modal-card large">
+    <form id="transaction-form">
 
-      <div class="modal-header">
+      <input
+        id="transaction-id"
+        type="hidden"
+      >
 
-        <div>
 
-          <p
-            class="eyebrow"
-            id="transaction-modal-eyebrow"
-          >
-            Новая операция
-          </p>
+      <!-- TYPE -->
 
-          <h2 id="transaction-modal-title">
-            Расход
-          </h2>
-
-        </div>
-
+      <div class="transaction-type-tabs">
 
         <button
-          class="close-button"
-          data-close-modal="transaction-modal"
+          class="transaction-type active"
+          data-transaction-type="expense"
           type="button"
-          aria-label="Закрыть"
         >
-          ×
+          Расход
+        </button>
+
+        <button
+          class="transaction-type"
+          data-transaction-type="income"
+          type="button"
+        >
+          Доход
         </button>
 
       </div>
 
+
+      <!-- AMOUNT -->
+
+      <label class="amount-field">
+
+        <span>Сумма</span>
+
+        <div class="amount-input-wrap">
+
+          <input
+            id="transaction-amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="0"
+            required
+            autocomplete="off"
+          >
+
+          <span>₽</span>
+
+        </div>
+
+      </label>
+
+
+      <!-- CATEGORY -->
+
+      <div class="transaction-category-block">
+
+        <div class="transaction-field-heading">
+
+          <span>Категория</span>
+
+          <button
+            id="quick-add-category"
+            class="link-button"
+            type="button"
+          >
+            + Новая
+          </button>
+
+        </div>
+
+
+        <div
+          id="transaction-category-chips"
+          class="transaction-category-chips"
+        ></div>
+
+
+        <select
+          id="transaction-category"
+          class="transaction-category-hidden"
+        >
+        </select>
+
+      </div>
+
+
+      <!-- MERCHANT -->
+
+      <label class="expense-only">
+
+        Магазин / место
+
+        <input
+          id="transaction-merchant"
+          list="merchant-options"
+          placeholder="Например, ВкусВилл"
+          autocomplete="off"
+        >
+
+      </label>
+
+
+      <datalist id="merchant-options"></datalist>
+
+
+      <!-- DATE -->
+
+      <label>
+
+        Дата
+
+        <input
+          id="transaction-date"
+          type="date"
+          required
+        >
+
+      </label>
+
+
+      <!-- NOTES -->
+
+      <label>
+
+        Комментарий
+
+        <input
+          id="transaction-note"
+          type="text"
+          placeholder="Необязательно"
+          autocomplete="off"
+        >
+
+      </label>
+
+
+      <!-- ITEMS -->
+
+      <div
+        id="transaction-items-section"
+        class="transaction-items-section expense-only"
+      >
+
+        <div class="transaction-field-heading">
+
+          <span>Детализация</span>
+
+          <button
+            id="add-item-button"
+            class="link-button"
+            type="button"
+          >
+            + Добавить
+          </button>
+
+        </div>
+
+        <div id="transaction-items"></div>
+
+        <div
+          id="transaction-items-total"
+          class="transaction-items-total"
+        ></div>
+
+      </div>
+
+
+      <!-- ACTIONS -->
+
+      <div class="modal-actions">
+
+        <button
+          class="secondary-button"
+          type="button"
+          data-close-modal="transaction-modal"
+        >
+          Отмена
+        </button>
+
+        <button
+          class="primary-button"
+          type="submit"
+        >
+          Сохранить
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</div>
+
+
+<!-- =====================================================
+     QUICK CATEGORY MODAL
+====================================================== -->
+
+<div
+  id="quick-category-modal"
+  class="modal hidden"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="quick-category-title"
+>
+
+  <div class="modal-backdrop"></div>
+
+  <div class="modal-card quick-category-card">
+
+    <div class="modal-header">
+
+      <div>
+
+        <p class="eyebrow">
+          Новая категория
+        </p>
+
+        <h2 id="quick-category-title">
+          Добавить категорию
+        </h2>
+
+      </div>
+
+      <button
+        class="close-button"
+        data-close-modal="quick-category-modal"
+        type="button"
+        aria-label="Закрыть"
+      >
+        ×
+      </button>
+
+    </div>
+
+
+    <form id="quick-category-form">
+
+      <label>
+
+        Название
+
+        <input
+          id="quick-category-name"
+          type="text"
+          placeholder="Например, Кофе"
+          maxlength="50"
+          autocomplete="off"
+          required
+        >
+
+      </label>
+
+
+      <div class="modal-actions">
+
+        <button
+          class="secondary-button"
+          type="button"
+          data-close-modal="quick-category-modal"
+        >
+          Отмена
+        </button>
+
+        <button
+          class="primary-button"
+          type="submit"
+        >
+          Добавить
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</div>
 
       <!-- TYPE -->
 
