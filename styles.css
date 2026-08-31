@@ -2528,3 +2528,77 @@ and (pointer: coarse) {
       .01ms !important;
   }
 }
+
+
+.transaction-field-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.transaction-field-actions .link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 32px;
+  padding: 6px 11px;
+
+  border: 1px solid var(--border);
+  border-radius: 8px;
+
+  background: var(--surface);
+  color: var(--text);
+
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    background-color .15s ease,
+    border-color .15s ease,
+    color .15s ease,
+    transform .1s ease;
+}
+
+.transaction-field-actions .link-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.transaction-field-actions .link-button:active {
+  transform: translateY(1px);
+}
+
+.transaction-field-actions #quick-add-subcategory {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.transaction-field-actions #quick-add-subcategory:hover {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.transaction-field-actions .link-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+@media (max-width: 699px) {
+  .transaction-field-actions {
+    gap: 6px;
+  }
+
+  .transaction-field-actions .link-button {
+    min-height: 30px;
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+}

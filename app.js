@@ -420,25 +420,38 @@ function setupEvents() {
   );
 
 
-  $("#quick-add-category")?.addEventListener(
-    "click",
-    () => {
-      openQuickCategoryModal(
-        getSelectedTransactionMainCategoryId()
-      );
-    }
-  );
+$("#quick-add-category")?.addEventListener(
+  "click",
+  () => {
+    openQuickCategoryModal();
+  }
+);
 
   $("#quick-add-subcategory")?.addEventListener(
   "click",
   () => {
 
     const parentId =
-      getSelectedTransactionMainCategoryId();
+      $("#transaction-category")?.value || "";
 
     if (!parentId) {
       showToast(
         "Сначала выберите основную категорию.",
+        "error"
+      );
+
+      return;
+    }
+
+    const parent =
+      getCategory(parentId);
+
+    if (
+      !parent ||
+      parent.parent_id !== null
+    ) {
+      showToast(
+        "Выберите основную категорию.",
         "error"
       );
 
