@@ -1106,3 +1106,682 @@ label {
     padding: 25px;
   }
 }
+
+
+/* ============================================================
+   FINTRACKER MOBILE APP
+   ============================================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #f6f7f9;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f6f7f9;
+  color: #15171a;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: 560px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding-bottom: 88px;
+}
+
+.app-content {
+  padding: 16px;
+}
+
+
+/* ------------------------------------------------------------
+   MOBILE HEADER
+   ------------------------------------------------------------ */
+
+.mobile-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  min-height: 64px;
+  padding: 10px 16px;
+
+  background: rgba(246, 247, 249, 0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.mobile-header-title {
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+
+.mobile-header-subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #777c84;
+}
+
+
+/* ------------------------------------------------------------
+   MONTH SELECTOR
+   ------------------------------------------------------------ */
+
+.month-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 16px;
+}
+
+.month-switcher button {
+  width: 42px;
+  height: 42px;
+
+  border: 0;
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  cursor: pointer;
+}
+
+.month-switcher-current {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+
+/* ------------------------------------------------------------
+   DASHBOARD CARDS
+   ------------------------------------------------------------ */
+
+.money-card {
+  padding: 20px;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.money-card-label {
+  font-size: 13px;
+  color: #7c8188;
+}
+
+.money-card-value {
+  margin-top: 6px;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.money-card-secondary {
+  margin-top: 5px;
+  font-size: 13px;
+  color: #858991;
+}
+
+
+/* ------------------------------------------------------------
+   QUICK ACTIONS
+   ------------------------------------------------------------ */
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+
+  margin: 14px 0;
+}
+
+.quick-action {
+  min-height: 58px;
+
+  border: 0;
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  font-weight: 700;
+  cursor: pointer;
+
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.quick-action:active {
+  transform: scale(0.98);
+}
+
+
+/* ------------------------------------------------------------
+   TRANSACTION LIST
+   ------------------------------------------------------------ */
+
+.transaction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transaction-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  min-height: 68px;
+  padding: 10px 12px;
+
+  border-radius: 18px;
+  background: #ffffff;
+
+  cursor: pointer;
+}
+
+.transaction-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+
+  border-radius: 14px;
+  background: #f0f1f3;
+
+  font-size: 18px;
+}
+
+.transaction-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.transaction-title {
+  overflow: hidden;
+
+  font-size: 14px;
+  font-weight: 650;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.transaction-meta {
+  margin-top: 3px;
+
+  overflow: hidden;
+
+  font-size: 12px;
+  color: #858a91;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.transaction-amount {
+  flex: 0 0 auto;
+
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.transaction-amount.expense {
+  color: #17191c;
+}
+
+.transaction-amount.income {
+  color: #198754;
+}
+
+
+/* ------------------------------------------------------------
+   BOTTOM NAVIGATION
+   ------------------------------------------------------------ */
+
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+
+  z-index: 100;
+
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+
+  width: 100%;
+  max-width: 560px;
+
+  min-height: 74px;
+
+  transform: translateX(-50%);
+
+  padding:
+    8px 8px
+    calc(8px + env(safe-area-inset-bottom));
+
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 4px;
+
+  border: 0;
+  background: transparent;
+
+  color: #858a91;
+
+  font-size: 11px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+.bottom-nav-item-icon {
+  font-size: 21px;
+  line-height: 1;
+}
+
+.bottom-nav-item.active {
+  color: #111315;
+}
+
+
+/* ------------------------------------------------------------
+   BOTTOM SHEET
+   ------------------------------------------------------------ */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+
+  z-index: 200;
+
+  background: rgba(0, 0, 0, 0.38);
+
+  opacity: 0;
+  pointer-events: none;
+
+  transition: opacity 0.2s ease;
+}
+
+.sheet-backdrop.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bottom-sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+
+  z-index: 201;
+
+  width: 100%;
+  max-width: 560px;
+
+  max-height: 92vh;
+
+  overflow-y: auto;
+
+  transform:
+    translate(-50%, 100%);
+
+  border-radius: 28px 28px 0 0;
+
+  background: #ffffff;
+
+  padding:
+    12px
+    16px
+    calc(20px + env(safe-area-inset-bottom));
+
+  transition: transform 0.25s ease;
+}
+
+.bottom-sheet.visible {
+  transform:
+    translate(-50%, 0);
+}
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+
+  margin: 0 auto 18px;
+
+  border-radius: 999px;
+
+  background: #d5d7da;
+}
+
+.sheet-title {
+  margin-bottom: 18px;
+
+  font-size: 22px;
+  font-weight: 800;
+}
+
+
+/* ------------------------------------------------------------
+   FORMS
+   ------------------------------------------------------------ */
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-label {
+  display: block;
+
+  margin-bottom: 7px;
+
+  font-size: 13px;
+  font-weight: 650;
+  color: #686d74;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+
+  min-height: 50px;
+
+  padding: 0 14px;
+
+  border: 1px solid #e0e2e5;
+  border-radius: 15px;
+
+  outline: none;
+
+  background: #f8f9fa;
+
+  color: #17191c;
+}
+
+.form-textarea {
+  min-height: 90px;
+  padding-top: 13px;
+  padding-bottom: 13px;
+
+  resize: vertical;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: #aeb3ba;
+  background: #ffffff;
+}
+
+
+/* ------------------------------------------------------------
+   AMOUNT INPUT
+   ------------------------------------------------------------ */
+
+.amount-input {
+  width: 100%;
+
+  padding: 8px 0;
+
+  border: 0;
+  outline: none;
+
+  background: transparent;
+
+  font-size: 44px;
+  font-weight: 800;
+
+  letter-spacing: -0.05em;
+}
+
+.amount-input::placeholder {
+  color: #c6c9cd;
+}
+
+
+/* ------------------------------------------------------------
+   ITEM EDITOR
+   ------------------------------------------------------------ */
+
+.items-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item-editor-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px 42px;
+
+  gap: 7px;
+}
+
+.item-editor-row input {
+  width: 100%;
+  min-width: 0;
+
+  height: 46px;
+
+  padding: 0 12px;
+
+  border: 1px solid #e0e2e5;
+  border-radius: 13px;
+
+  background: #f8f9fa;
+}
+
+.item-remove {
+  width: 42px;
+  height: 46px;
+
+  border: 0;
+  border-radius: 13px;
+
+  background: #f1f2f4;
+
+  cursor: pointer;
+}
+
+.add-item-button {
+  min-height: 46px;
+
+  border: 1px dashed #cdd0d4;
+  border-radius: 13px;
+
+  background: transparent;
+
+  color: #555a61;
+
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+
+/* ------------------------------------------------------------
+   PRIMARY BUTTON
+   ------------------------------------------------------------ */
+
+.primary-button {
+  width: 100%;
+  min-height: 54px;
+
+  margin-top: 8px;
+
+  border: 0;
+  border-radius: 17px;
+
+  background: #17191c;
+  color: #ffffff;
+
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+.primary-button:active {
+  transform: scale(0.985);
+}
+
+
+/* ------------------------------------------------------------
+   CATEGORY / TAG CHIPS
+   ------------------------------------------------------------ */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chip {
+  min-height: 36px;
+
+  padding: 0 13px;
+
+  border: 1px solid #e0e2e5;
+  border-radius: 999px;
+
+  background: #ffffff;
+
+  color: #535860;
+
+  font-size: 13px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+.chip.active {
+  border-color: #17191c;
+  background: #17191c;
+  color: #ffffff;
+}
+
+
+/* ------------------------------------------------------------
+   SECTION
+   ------------------------------------------------------------ */
+
+.section {
+  margin-top: 22px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 10px;
+}
+
+.section-title {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.section-action {
+  border: 0;
+  background: transparent;
+
+  color: #696e75;
+
+  font-size: 13px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+
+/* ------------------------------------------------------------
+   EMPTY STATE
+   ------------------------------------------------------------ */
+
+.empty-state {
+  padding: 36px 20px;
+
+  text-align: center;
+
+  color: #858a91;
+}
+
+.empty-state-title {
+  margin-bottom: 5px;
+
+  color: #383c41;
+
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.empty-state-text {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
+/* ------------------------------------------------------------
+   DESKTOP — ONLY A COMPATIBILITY VERSION
+   ------------------------------------------------------------ */
+
+@media (min-width: 700px) {
+  body {
+    background: #e9ebee;
+  }
+
+  .app-shell {
+    background: #f6f7f9;
+    box-shadow:
+      0 0 40px rgba(0, 0, 0, 0.08);
+  }
+}
