@@ -1383,9 +1383,20 @@ function renderEverything() {
 
 function renderDashboard() {
 
+  const selectedMonth =
+    state.selectedMonth;
+
+  const monthTransactions =
+    state.transactions.filter(
+      transaction =>
+        transaction.date?.startsWith(
+          selectedMonth
+        )
+    );
+
   const income =
     sum(
-      state.transactions
+      monthTransactions
         .filter(
           transaction =>
             transaction.type === "income"
@@ -1398,7 +1409,7 @@ function renderDashboard() {
 
   const expenses =
     sum(
-      state.transactions
+      monthTransactions
         .filter(
           transaction =>
             transaction.type === "expense"
@@ -1411,13 +1422,17 @@ function renderDashboard() {
 
   calculateAllTimeBalance()
     .then(balance => {
+
       setText(
         "#balance-value",
         money(balance)
       );
+
     })
     .catch(error => {
+
       console.error(error);
+
     });
 
   const remaining =
@@ -1441,12 +1456,49 @@ function renderDashboard() {
   setText(
     "#dashboard-month-title",
     formatMonthTitle(
-      state.selectedMonth
+      selectedMonth
     )
   );
 
-  renderCategoryOverview();
+
+  const monthLabel =
+  formatMonthTitle(
+    selectedMonth
+  );
+
+setText(
+  "#income-caption",
+  `за ${monthLabel.toLowerCase()}`
+);
+
+setText(
+  "#expense-caption",
+  `за ${monthLabel.toLowerCase()}`
+);
+
+setText(
+  "#remaining-caption",
+  `за ${monthLabel.toLowerCase()}`
+);
+
+
+const remainingCard =
+  $(".summary-card.remaining");
+
+if (remainingCard) {
+
+  remainingCard.classList.toggle(
+    "negative",
+    remaining < 0
+  );
+}
+
+  renderCategoryOverview(
+    monthTransactions
+  );
+
   renderRecentTransactions();
+
   renderInsights();
 }
 
@@ -1479,7 +1531,9 @@ async function calculateAllTimeBalance() {
    CATEGORY OVERVIEW
 ========================================================= */
 
-function renderCategoryOverview() {
+function renderCategoryOverview(
+  monthTransactions = null
+) {
 
   const container =
     $("#category-overview");
@@ -1489,12 +1543,16 @@ function renderCategoryOverview() {
   }
 
   const expenses =
-    state.transactions.filter(
+    (
+      monthTransactions ||
+      state.transactions
+    ).filter(
       transaction =>
         transaction.type === "expense"
     );
 
   if (!expenses.length) {
+
     container.innerHTML =
       emptyState(
         "В этом месяце расходов пока нет."
@@ -1522,47 +1580,55 @@ function renderCategoryOverview() {
         (a, b) =>
           b[1] - a[1]
       )
-      .slice(0, 8);
+      .slice(0, 6);
 
   container.innerHTML =
-    rows.map(
-      ([name, amount]) => {
+    rows
+      .map(
+        ([name, amount]) => {
 
-        const percent =
-          total > 0
-            ? Math.round(
-                amount / total * 100
-              )
-            : 0;
+          const percent =
+            total > 0
+              ? Math.round(
+                  amount /
+                  total *
+                  100
+                )
+              : 0;
 
-        return `
-          <div class="category-row">
+          return `
+            <div class="category-row">
 
-            <div class="category-main">
+              <div class="category-main">
 
-              <div class="category-name">
-                <span>
-                  ${escapeHtml(name)}
-                </span>
+                <div class="category-name">
 
-                <span>
-                  ${money(amount)}
-                </span>
-              </div>
+                  <span>
+                    ${escapeHtml(name)}
+                  </span>
 
-              <div class="progress">
-                <div
-                  class="progress-bar"
-                  style="width:${percent}%"
-                ></div>
+                  <span>
+                    ${money(amount)}
+                  </span>
+
+                </div>
+
+                <div class="progress">
+
+                  <div
+                    class="progress-bar"
+                    style="width:${percent}%"
+                  ></div>
+
+                </div>
+
               </div>
 
             </div>
-
-          </div>
-        `;
-      }
-    ).join("");
+          `;
+        }
+      )
+      .join("");
 }
 
 
@@ -1676,6 +1742,77 @@ function renderTransactions() {
 }
 
 
+function getTransactionIcon(transaction) {
+
+  if (
+    transaction.type === "income"
+  ) {
+    return "↗";
+  }
+
+  const category =
+    getCategory(
+      transaction.category_id
+    );
+
+  const name =
+    category?.name
+      ?.toLowerCase() || "";
+
+  if (
+    name.includes("продукт") ||
+    name.includes("еда") ||
+    name.includes("магазин")
+  ) {
+    return "🛒";
+  }
+
+  if (
+    name.includes("транспорт") ||
+    name.includes("такси") ||
+    name.includes("авто")
+  ) {
+    return "↗";
+  }
+
+  if (
+    name.includes("жиль") ||
+    name.includes("квартир") ||
+    name.includes("дом")
+  ) {
+    return "⌂";
+  }
+
+  if (
+    name.includes("одежд")
+  ) {
+    return "◇";
+  }
+
+  if (
+    name.includes("здоров") ||
+    name.includes("медицин")
+  ) {
+    return "+";
+  }
+
+  if (
+    name.includes("развлеч") ||
+    name.includes("игр")
+  ) {
+    return "◈";
+  }
+
+  if (
+    name.includes("подпис")
+  ) {
+    return "◌";
+  }
+
+  return "−";
+}
+
+
 function renderTransactionRow(
   transaction
 ) {
@@ -1714,9 +1851,16 @@ function renderTransactionRow(
       )}"
     >
 
-      <div class="transaction-icon">
-        ${ICONS[transaction.type] || "•"}
-      </div>
+      <div
+  class="transaction-icon ${
+    isIncome
+      ? "income"
+      : "expense"
+  }"
+  aria-hidden="true"
+>
+  ${ICONS[transaction.type] || "•"}
+</div>
 
       <div class="transaction-content">
 

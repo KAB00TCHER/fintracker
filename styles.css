@@ -895,7 +895,43 @@ label {
 .transaction-list.full {
   min-height: 80px;
 }
+.transaction-icon {
+  width: 42px;
+  height: 42px;
 
+  flex: 0 0 42px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid var(--border);
+  border-radius: 12px;
+
+  background: var(--surface-soft);
+
+  color: var(--muted);
+
+  font-size: 18px;
+  font-weight: 800;
+
+  line-height: 1;
+}
+
+.transaction-icon.expense {
+  color: var(--expense);
+  background: var(--expense-soft);
+  border-color: transparent;
+}
+
+.transaction-icon.income {
+  color: var(--income);
+  background: var(--income-soft);
+  border-color: transparent;
+}
+
+.transaction-row:hover .transaction-icon {
+  border-color: var(--border-strong);
+}
 .transaction-row {
   display: grid;
 
@@ -2601,4 +2637,13 @@ and (pointer: coarse) {
     padding: 6px 9px;
     font-size: 11px;
   }
+}
+
+
+.summary-card.remaining.negative strong {
+  color: var(--expense);
+}
+
+.summary-card.remaining:not(.negative) strong {
+  color: var(--income);
 }
