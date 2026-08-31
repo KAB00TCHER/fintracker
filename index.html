@@ -1,409 +1,961 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
   <meta name="theme-color" content="#f5f3ef">
+  <meta
+    name="description"
+    content="Личный трекер финансов"
+  >
+
   <title>Мои деньги</title>
+
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
 
 <div id="app">
 
-  <!-- AUTH -->
+  <!-- =====================================================
+       AUTH
+  ====================================================== -->
 
-  <section id="auth-screen" class="screen auth-screen hidden">
+  <section
+    id="auth-screen"
+    class="screen auth-screen hidden"
+  >
+
     <div class="auth-card">
+
       <div class="brand">
-        <div class="brand-mark">₽</div>
+
+        <div class="brand-mark">
+          ₽
+        </div>
+
         <div>
           <h1>Мои деньги</h1>
           <p>Личный трекер финансов</p>
         </div>
+
       </div>
+
 
       <div class="auth-tabs">
-        <button class="auth-tab active" data-auth-tab="login">Войти</button>
-        <button class="auth-tab" data-auth-tab="register">Регистрация</button>
+
+        <button
+          class="auth-tab active"
+          data-auth-tab="login"
+          type="button"
+        >
+          Войти
+        </button>
+
+        <button
+          class="auth-tab"
+          data-auth-tab="register"
+          type="button"
+        >
+          Регистрация
+        </button>
+
       </div>
 
-      <form id="login-form" class="auth-form">
+
+      <!-- LOGIN -->
+
+      <form
+        id="login-form"
+        class="auth-form"
+      >
+
         <label>
           Почта
-          <input id="login-email" type="email" autocomplete="email" required>
+
+          <input
+            id="login-email"
+            type="email"
+            inputmode="email"
+            autocomplete="email"
+            placeholder="you@example.com"
+            required
+          >
         </label>
+
 
         <label>
           Пароль
-          <input id="login-password" type="password" autocomplete="current-password" required>
+
+          <input
+            id="login-password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Введите пароль"
+            required
+          >
         </label>
 
-        <button class="primary-button" type="submit">Войти</button>
 
-        <button id="forgot-password" class="text-button" type="button">
+        <button
+          class="primary-button"
+          type="submit"
+        >
+          Войти
+        </button>
+
+
+        <button
+          id="forgot-password"
+          class="text-button"
+          type="button"
+        >
           Забыли пароль?
         </button>
+
       </form>
 
-      <form id="register-form" class="auth-form hidden">
+
+      <!-- REGISTER -->
+
+      <form
+        id="register-form"
+        class="auth-form hidden"
+      >
+
         <label>
           Почта
-          <input id="register-email" type="email" autocomplete="email" required>
+
+          <input
+            id="register-email"
+            type="email"
+            inputmode="email"
+            autocomplete="email"
+            placeholder="you@example.com"
+            required
+          >
         </label>
+
 
         <label>
           Пароль
-          <input id="register-password" type="password" autocomplete="new-password" minlength="6" required>
+
+          <input
+            id="register-password"
+            type="password"
+            autocomplete="new-password"
+            placeholder="Минимум 6 символов"
+            minlength="6"
+            required
+          >
         </label>
+
 
         <label>
           Повторите пароль
-          <input id="register-password-confirm" type="password" autocomplete="new-password" minlength="6" required>
+
+          <input
+            id="register-password-confirm"
+            type="password"
+            autocomplete="new-password"
+            placeholder="Повторите пароль"
+            minlength="6"
+            required
+          >
         </label>
 
-        <button class="primary-button" type="submit">Создать аккаунт</button>
+
+        <button
+          class="primary-button"
+          type="submit"
+        >
+          Создать аккаунт
+        </button>
+
       </form>
 
-      <div id="auth-message" class="form-message"></div>
+
+      <div
+        id="auth-message"
+        class="form-message"
+        aria-live="polite"
+      ></div>
+
     </div>
+
   </section>
 
 
-  <!-- MAIN APP -->
+  <!-- =====================================================
+       MAIN APP
+  ====================================================== -->
 
-  <section id="main-screen" class="screen hidden">
+  <section
+    id="main-screen"
+    class="screen hidden"
+  >
+
+
+    <!-- TOP BAR -->
 
     <header class="topbar">
+
       <div class="topbar-brand">
-        <div class="brand-mark small">₽</div>
+
+        <div class="brand-mark small">
+          ₽
+        </div>
+
         <span>Мои деньги</span>
+
       </div>
+
 
       <div class="topbar-actions">
-        <button id="month-picker-button" class="month-button"></button>
-        <button id="user-menu-button" class="user-button">•••</button>
+
+        <button
+          id="month-picker-button"
+          class="month-button"
+          type="button"
+          aria-label="Выбрать месяц"
+        ></button>
+
+
+        <button
+          id="user-menu-button"
+          class="user-button"
+          type="button"
+          aria-label="Меню пользователя"
+          aria-expanded="false"
+        >
+          •••
+        </button>
+
       </div>
 
-      <div id="user-menu" class="user-menu hidden">
-        <div id="user-email" class="user-email"></div>
-        <button id="export-data">Экспорт данных</button>
-        <button id="logout-button">Выйти</button>
+
+      <!-- USER MENU -->
+
+      <div
+        id="user-menu"
+        class="user-menu hidden"
+      >
+
+        <div
+          id="user-email"
+          class="user-email"
+        ></div>
+
+
+        <button
+          id="export-data"
+          type="button"
+        >
+          Экспорт данных
+        </button>
+
+
+        <button
+          id="logout-button"
+          type="button"
+        >
+          Выйти
+        </button>
+
       </div>
+
     </header>
 
 
+    <!-- =================================================
+         CONTENT
+    ================================================== -->
+
     <main class="content">
 
-      <!-- DASHBOARD -->
 
-      <section id="page-dashboard" class="page active">
+      <!-- =================================================
+           DASHBOARD
+      ================================================== -->
+
+      <section
+        id="page-dashboard"
+        class="page active"
+      >
 
         <div class="page-heading">
+
           <div>
-            <p class="eyebrow">Обзор</p>
-            <h2 id="dashboard-month-title">Август 2026</h2>
+            <p class="eyebrow">
+              Обзор
+            </p>
+
+            <h2 id="dashboard-month-title">
+              Август 2026
+            </h2>
           </div>
+
 
           <div class="quick-actions">
-            <button id="quick-expense" class="primary-button">
-              + Расход
+
+            <button
+              id="quick-expense"
+              class="primary-button"
+              type="button"
+            >
+              <span aria-hidden="true">+</span>
+              Расход
             </button>
-            <button id="quick-income" class="secondary-button">
-              + Доход
+
+
+            <button
+              id="quick-income"
+              class="secondary-button"
+              type="button"
+            >
+              <span aria-hidden="true">+</span>
+              Доход
             </button>
+
           </div>
+
         </div>
 
+
+        <!-- SUMMARY -->
 
         <div class="summary-grid">
 
           <article class="summary-card balance">
+
             <span>Баланс</span>
-            <strong id="balance-value">0 ₽</strong>
-            <small id="balance-caption">за всё время</small>
+
+            <strong id="balance-value">
+              0 ₽
+            </strong>
+
+            <small id="balance-caption">
+              за всё время
+            </small>
+
           </article>
+
 
           <article class="summary-card income">
+
             <span>Доходы</span>
-            <strong id="income-value">0 ₽</strong>
-            <small id="income-caption">за месяц</small>
+
+            <strong id="income-value">
+              0 ₽
+            </strong>
+
+            <small id="income-caption">
+              за месяц
+            </small>
+
           </article>
+
 
           <article class="summary-card expense">
+
             <span>Расходы</span>
-            <strong id="expense-value">0 ₽</strong>
-            <small id="expense-caption">за месяц</small>
+
+            <strong id="expense-value">
+              0 ₽
+            </strong>
+
+            <small id="expense-caption">
+              за месяц
+            </small>
+
           </article>
+
 
           <article class="summary-card remaining">
+
             <span>Свободно</span>
-            <strong id="remaining-value">0 ₽</strong>
-            <small id="remaining-caption">до конца месяца</small>
+
+            <strong id="remaining-value">
+              0 ₽
+            </strong>
+
+            <small id="remaining-caption">
+              за месяц
+            </small>
+
           </article>
 
         </div>
 
 
-        <div class="dashboard-grid">
+        <!-- CATEGORY OVERVIEW -->
 
-          <article class="panel">
-            <div class="panel-heading">
-              <div>
-                <h3>Расходы по категориям</h3>
-                <p>За выбранный месяц</p>
-              </div>
-              <button class="link-button" data-page="analytics">Подробнее</button>
-            </div>
+        <article class="panel">
 
-            <div id="category-overview" class="category-overview"></div>
-          </article>
-
-
-          <article class="panel">
-            <div class="panel-heading">
-              <div>
-                <h3>Последние операции</h3>
-                <p>Самые свежие записи</p>
-              </div>
-              <button class="link-button" data-page="transactions">Все</button>
-            </div>
-
-            <div id="recent-transactions" class="transaction-list"></div>
-          </article>
-
-        </div>
-
-
-        <article class="panel attention-panel">
           <div class="panel-heading">
+
             <div>
-              <h3>Куда можно посмотреть</h3>
-              <p>Автоматически найденные изменения расходов</p>
+              <h3>Расходы по категориям</h3>
+              <p>За выбранный месяц</p>
             </div>
+
+
+            <button
+              class="link-button"
+              data-page="analytics"
+              type="button"
+            >
+              Подробнее
+            </button>
+
           </div>
 
-          <div id="insights" class="insights"></div>
+
+          <div
+            id="category-overview"
+            class="category-overview"
+          ></div>
+
+        </article>
+
+
+        <!-- RECENT TRANSACTIONS -->
+
+        <article class="panel">
+
+          <div class="panel-heading">
+
+            <div>
+              <h3>Последние операции</h3>
+              <p>Самые свежие записи</p>
+            </div>
+
+
+            <button
+              class="link-button"
+              data-page="transactions"
+              type="button"
+            >
+              Все
+            </button>
+
+          </div>
+
+
+          <div
+            id="recent-transactions"
+            class="transaction-list"
+          ></div>
+
+        </article>
+
+
+        <!-- INSIGHTS -->
+
+        <article class="panel attention-panel">
+
+          <div class="panel-heading">
+
+            <div>
+              <h3>Куда можно посмотреть</h3>
+              <p>
+                Автоматически найденные изменения расходов
+              </p>
+            </div>
+
+          </div>
+
+
+          <div
+            id="insights"
+            class="insights"
+          ></div>
+
         </article>
 
       </section>
 
 
-      <!-- TRANSACTIONS -->
+      <!-- =================================================
+           TRANSACTIONS
+      ================================================== -->
 
-      <section id="page-transactions" class="page">
+      <section
+        id="page-transactions"
+        class="page"
+      >
 
         <div class="page-heading">
+
           <div>
-            <p class="eyebrow">История</p>
-            <h2>Операции</h2>
+            <p class="eyebrow">
+              История
+            </p>
+
+            <h2>
+              Операции
+            </h2>
           </div>
 
-          <button id="transactions-add" class="primary-button">
-            + Добавить
+
+          <button
+            id="transactions-add"
+            class="primary-button"
+            type="button"
+          >
+            <span aria-hidden="true">+</span>
+            Добавить
           </button>
+
         </div>
 
+
+        <!-- FILTERS -->
 
         <div class="filters panel">
 
           <label>
             Поиск
-            <input id="transaction-search" type="search" placeholder="Магазин, товар, комментарий">
+
+            <input
+              id="transaction-search"
+              type="search"
+              placeholder="Магазин, товар..."
+              autocomplete="off"
+            >
           </label>
 
-          <label>
-            Тип
-            <select id="transaction-type-filter">
-              <option value="all">Все</option>
-              <option value="expense">Расходы</option>
-              <option value="income">Доходы</option>
-            </select>
-          </label>
 
-          <label>
-            Категория
-            <select id="transaction-category-filter">
-              <option value="all">Все категории</option>
-            </select>
-          </label>
+          <div class="filter-row">
+
+            <label>
+              Тип
+
+              <select id="transaction-type-filter">
+
+                <option value="all">
+                  Все
+                </option>
+
+                <option value="expense">
+                  Расходы
+                </option>
+
+                <option value="income">
+                  Доходы
+                </option>
+
+              </select>
+            </label>
+
+
+            <label>
+              Категория
+
+              <select id="transaction-category-filter">
+
+                <option value="all">
+                  Все категории
+                </option>
+
+              </select>
+
+            </label>
+
+          </div>
 
         </div>
 
-        <div class="panel">
-          <div id="all-transactions" class="transaction-list full"></div>
+
+        <!-- LIST -->
+
+        <div class="panel transaction-panel">
+
+          <div
+            id="all-transactions"
+            class="transaction-list full"
+          ></div>
+
         </div>
 
       </section>
 
 
-      <!-- ANALYTICS -->
+      <!-- =================================================
+           ANALYTICS
+      ================================================== -->
 
-      <section id="page-analytics" class="page">
+      <section
+        id="page-analytics"
+        class="page"
+      >
 
         <div class="page-heading">
+
           <div>
-            <p class="eyebrow">Анализ</p>
-            <h2>Куда уходят деньги</h2>
+            <p class="eyebrow">
+              Анализ
+            </p>
+
+            <h2>
+              Куда уходят деньги
+            </h2>
           </div>
+
         </div>
 
+
+        <!-- PERIOD -->
 
         <div class="analytics-periods">
-          <button class="period-button active" data-period="month">Месяц</button>
-          <button class="period-button" data-period="3months">3 месяца</button>
-          <button class="period-button" data-period="year">Год</button>
-        </div>
 
-
-        <div class="analytics-grid">
-
-          <article class="panel">
-            <div class="panel-heading">
-              <div>
-                <h3>Категории</h3>
-                <p id="analytics-category-caption"></p>
-              </div>
-            </div>
-
-            <div id="analytics-categories"></div>
-          </article>
-
-
-          <article class="panel">
-            <div class="panel-heading">
-              <div>
-                <h3>Магазины и места</h3>
-                <p>Где остаётся больше всего денег</p>
-              </div>
-            </div>
-
-            <div id="analytics-merchants"></div>
-          </article>
-
-
-          <article class="panel wide">
-            <div class="panel-heading">
-              <div>
-                <h3>Конкретные товары</h3>
-                <p>Самые крупные позиции расходов</p>
-              </div>
-            </div>
-
-            <div id="analytics-items"></div>
-          </article>
-
-        </div>
-
-      </section>
-
-
-      <!-- BUDGETS -->
-
-      <section id="page-budgets" class="page">
-
-        <div class="page-heading">
-          <div>
-            <p class="eyebrow">Планирование</p>
-            <h2>Бюджеты</h2>
-          </div>
-
-          <button id="add-budget-button" class="primary-button">
-            + Лимит
+          <button
+            class="period-button active"
+            data-period="month"
+            type="button"
+          >
+            Месяц
           </button>
+
+
+          <button
+            class="period-button"
+            data-period="3months"
+            type="button"
+          >
+            3 месяца
+          </button>
+
+
+          <button
+            class="period-button"
+            data-period="year"
+            type="button"
+          >
+            Год
+          </button>
+
         </div>
 
-        <div id="budgets-list" class="budgets-grid"></div>
+
+        <!-- CATEGORY -->
+
+        <article class="panel">
+
+          <div class="panel-heading">
+
+            <div>
+              <h3>Категории</h3>
+
+              <p id="analytics-category-caption">
+                Всего: 0 ₽
+              </p>
+            </div>
+
+          </div>
+
+
+          <div
+            id="analytics-categories"
+            class="analytics-list"
+          ></div>
+
+        </article>
+
+
+        <!-- MERCHANTS -->
+
+        <article class="panel">
+
+          <div class="panel-heading">
+
+            <div>
+              <h3>Магазины и места</h3>
+
+              <p>
+                Где остаётся больше всего денег
+              </p>
+            </div>
+
+          </div>
+
+
+          <div
+            id="analytics-merchants"
+            class="analytics-list"
+          ></div>
+
+        </article>
+
+
+        <!-- ITEMS -->
+
+        <article class="panel">
+
+          <div class="panel-heading">
+
+            <div>
+              <h3>Конкретные товары</h3>
+
+              <p>
+                Самые крупные позиции расходов
+              </p>
+            </div>
+
+          </div>
+
+
+          <div
+            id="analytics-items"
+            class="analytics-list"
+          ></div>
+
+        </article>
 
       </section>
 
 
-      <!-- SETTINGS -->
+      <!-- =================================================
+           BUDGETS
+      ================================================== -->
 
-      <section id="page-settings" class="page">
+      <section
+        id="page-budgets"
+        class="page"
+      >
 
         <div class="page-heading">
+
           <div>
-            <p class="eyebrow">Настройки</p>
-            <h2>Справочники</h2>
+            <p class="eyebrow">
+              Планирование
+            </p>
+
+            <h2>
+              Лимиты
+            </h2>
           </div>
+
+
+          <button
+            id="add-budget-button"
+            class="primary-button"
+            type="button"
+          >
+            <span aria-hidden="true">+</span>
+            Лимит
+          </button>
+
+        </div>
+
+
+        <div
+          id="budgets-list"
+          class="budgets-grid"
+        ></div>
+
+      </section>
+
+
+      <!-- =================================================
+           SETTINGS
+      ================================================== -->
+
+      <section
+        id="page-settings"
+        class="page"
+      >
+
+        <div class="page-heading">
+
+          <div>
+            <p class="eyebrow">
+              Настройки
+            </p>
+
+            <h2>
+              Справочники
+            </h2>
+          </div>
+
         </div>
 
 
-        <div class="settings-grid">
+        <!-- CATEGORIES -->
 
-          <article class="panel">
-            <div class="panel-heading">
-              <div>
-                <h3>Категории</h3>
-                <p>Используются при добавлении операций</p>
-              </div>
+        <article class="panel">
+
+          <div class="panel-heading">
+
+            <div>
+              <h3>Категории</h3>
+
+              <p>
+                Используются при добавлении операций
+              </p>
             </div>
 
-            <div id="categories-settings"></div>
-
-            <form id="category-form" class="inline-form">
-              <input id="new-category-name" placeholder="Новая категория" required>
-              <select id="new-category-type">
-                <option value="expense">Расход</option>
-                <option value="income">Доход</option>
-              </select>
-              <button class="secondary-button" type="submit">Добавить</button>
-            </form>
-          </article>
+          </div>
 
 
-          <article class="panel">
-            <div class="panel-heading">
-              <div>
-                <h3>Магазины</h3>
-                <p>Часто используемые места</p>
-              </div>
+          <div
+            id="categories-settings"
+            class="settings-list"
+          ></div>
+
+
+          <form
+            id="category-form"
+            class="inline-form"
+          >
+
+            <input
+              id="new-category-name"
+              placeholder="Новая категория"
+              autocomplete="off"
+              required
+            >
+
+
+            <select id="new-category-type">
+
+              <option value="expense">
+                Расход
+              </option>
+
+              <option value="income">
+                Доход
+              </option>
+
+            </select>
+
+
+            <button
+              class="secondary-button"
+              type="submit"
+            >
+              Добавить
+            </button>
+
+          </form>
+
+        </article>
+
+
+        <!-- MERCHANTS -->
+
+        <article class="panel">
+
+          <div class="panel-heading">
+
+            <div>
+              <h3>Магазины</h3>
+
+              <p>
+                Часто используемые места
+              </p>
             </div>
 
-            <div id="merchants-settings"></div>
+          </div>
 
-            <form id="merchant-form" class="inline-form">
-              <input id="new-merchant-name" placeholder="Название магазина" required>
-              <button class="secondary-button" type="submit">Добавить</button>
-            </form>
-          </article>
 
-        </div>
+          <div
+            id="merchants-settings"
+            class="settings-list"
+          ></div>
+
+
+          <form
+            id="merchant-form"
+            class="inline-form"
+          >
+
+            <input
+              id="new-merchant-name"
+              placeholder="Название магазина"
+              autocomplete="off"
+              required
+            >
+
+
+            <button
+              class="secondary-button"
+              type="submit"
+            >
+              Добавить
+            </button>
+
+          </form>
+
+        </article>
 
       </section>
 
     </main>
 
 
-    <!-- BOTTOM NAV -->
+    <!-- =================================================
+         BOTTOM NAVIGATION
+    ================================================== -->
 
-    <nav class="bottom-nav">
+    <nav
+      class="bottom-nav"
+      aria-label="Основная навигация"
+    >
 
-      <button class="nav-button active" data-page="dashboard">
-        <span>⌂</span>
-        Главная
+      <button
+        class="nav-button active"
+        data-page="dashboard"
+        type="button"
+      >
+        <span class="nav-icon" aria-hidden="true">⌂</span>
+        <span>Главная</span>
       </button>
 
-      <button class="nav-button" data-page="transactions">
-        <span>☷</span>
-        Операции
+
+      <button
+        class="nav-button"
+        data-page="transactions"
+        type="button"
+      >
+        <span class="nav-icon" aria-hidden="true">☷</span>
+        <span>Операции</span>
       </button>
 
-      <button class="nav-button" data-page="analytics">
-        <span>◒</span>
-        Аналитика
+
+      <button
+        class="nav-button"
+        data-page="analytics"
+        type="button"
+      >
+        <span class="nav-icon" aria-hidden="true">◒</span>
+        <span>Аналитика</span>
       </button>
 
-      <button class="nav-button" data-page="budgets">
-        <span>▤</span>
-        Лимиты
+
+      <button
+        class="nav-button"
+        data-page="budgets"
+        type="button"
+      >
+        <span class="nav-icon" aria-hidden="true">▤</span>
+        <span>Лимиты</span>
       </button>
 
-      <button class="nav-button" data-page="settings">
-        <span>⚙</span>
-        Настройки
+
+      <button
+        class="nav-button"
+        data-page="settings"
+        type="button"
+      >
+        <span class="nav-icon" aria-hidden="true">⚙</span>
+        <span>Настройки</span>
       </button>
 
     </nav>
@@ -411,187 +963,452 @@
   </section>
 
 
-  <!-- TRANSACTION MODAL -->
+  <!-- =====================================================
+       TRANSACTION MODAL
+  ====================================================== -->
 
-  <div id="transaction-modal" class="modal hidden">
+  <div
+    id="transaction-modal"
+    class="modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="transaction-modal-title"
+  >
+
     <div class="modal-backdrop"></div>
+
 
     <div class="modal-card large">
 
       <div class="modal-header">
+
         <div>
-          <p class="eyebrow" id="transaction-modal-eyebrow">Новая операция</p>
-          <h2 id="transaction-modal-title">Расход</h2>
+
+          <p
+            class="eyebrow"
+            id="transaction-modal-eyebrow"
+          >
+            Новая операция
+          </p>
+
+          <h2 id="transaction-modal-title">
+            Расход
+          </h2>
+
         </div>
 
-        <button class="close-button" data-close-modal="transaction-modal">×</button>
+
+        <button
+          class="close-button"
+          data-close-modal="transaction-modal"
+          type="button"
+          aria-label="Закрыть"
+        >
+          ×
+        </button>
+
       </div>
 
 
+      <!-- TYPE -->
+
       <div class="transaction-type-tabs">
-        <button class="transaction-type active" data-transaction-type="expense">
+
+        <button
+          class="transaction-type active"
+          data-transaction-type="expense"
+          type="button"
+        >
           Расход
         </button>
 
-        <button class="transaction-type" data-transaction-type="income">
+
+        <button
+          class="transaction-type"
+          data-transaction-type="income"
+          type="button"
+        >
           Доход
         </button>
+
       </div>
 
 
       <form id="transaction-form">
 
-        <input id="transaction-id" type="hidden">
+        <input
+          id="transaction-id"
+          type="hidden"
+        >
+
 
         <div class="form-grid">
 
-          <label>
+          <!-- AMOUNT -->
+
+          <label class="amount-field">
+
             Сумма
-            <input id="transaction-amount" type="number" min="0.01" step="0.01" placeholder="0" required>
+
+            <input
+              id="transaction-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              inputmode="decimal"
+              placeholder="0"
+              required
+            >
+
           </label>
 
+
+          <!-- DATE -->
+
           <label>
+
             Дата
-            <input id="transaction-date" type="date" required>
+
+            <input
+              id="transaction-date"
+              type="date"
+              required
+            >
+
           </label>
+
+
+          <!-- MERCHANT -->
 
           <label class="expense-only">
+
             Магазин / место
-            <input id="transaction-merchant" list="merchant-options" placeholder="Например, Пятёрочка">
+
+            <input
+              id="transaction-merchant"
+              list="merchant-options"
+              placeholder="Например, ВкусВилл"
+              autocomplete="off"
+            >
+
+
             <datalist id="merchant-options"></datalist>
+
           </label>
+
+
+          <!-- INCOME SOURCE -->
 
           <label class="income-only hidden">
+
             Источник дохода
-            <input id="transaction-income-source" placeholder="Например, зарплата">
+
+            <input
+              id="transaction-income-source"
+              placeholder="Например, зарплата"
+              autocomplete="off"
+            >
+
           </label>
 
         </div>
 
 
-        <div id="expense-items-section" class="expense-only">
+        <!-- =================================================
+             RECEIPT ITEMS
+        ================================================== -->
+
+        <div
+          id="expense-items-section"
+          class="expense-only"
+        >
 
           <div class="section-heading">
+
             <div>
-              <h3>Состав покупки</h3>
-              <p>Можно оставить пустым или разобрать чек подробно</p>
+
+              <h3>
+                Состав покупки
+              </h3>
+
+              <p>
+                Разберите чек на отдельные позиции
+              </p>
+
             </div>
 
-            <button id="add-item-button" class="secondary-button small-button" type="button">
-              + Позиция
+
+            <button
+              id="add-item-button"
+              class="secondary-button small-button"
+              type="button"
+            >
+              <span aria-hidden="true">+</span>
+              Позиция
             </button>
+
           </div>
 
-          <div id="transaction-items"></div>
+
+          <div
+            id="transaction-items"
+            class="transaction-items"
+          ></div>
+
 
           <div class="items-summary">
-            <span>Сумма позиций</span>
-            <strong id="items-total">0 ₽</strong>
+
+            <span>
+              Сумма позиций
+            </span>
+
+            <strong id="items-total">
+              0 ₽
+            </strong>
+
           </div>
 
-          <div id="items-validation" class="validation-message"></div>
+
+          <div
+            id="items-validation"
+            class="validation-message"
+            aria-live="polite"
+          ></div>
 
         </div>
 
 
+        <!-- COMMENT -->
+
         <label>
+
           Комментарий
-          <textarea id="transaction-comment" rows="3" placeholder="Необязательно"></textarea>
+
+          <textarea
+            id="transaction-comment"
+            rows="3"
+            placeholder="Необязательно"
+          ></textarea>
+
         </label>
 
 
+        <!-- ACTIONS -->
+
         <div class="modal-actions">
-          <button class="secondary-button" type="button" data-close-modal="transaction-modal">
+
+          <button
+            class="secondary-button"
+            type="button"
+            data-close-modal="transaction-modal"
+          >
             Отмена
           </button>
 
-          <button class="primary-button" type="submit">
+
+          <button
+            class="primary-button"
+            type="submit"
+          >
             Сохранить
           </button>
+
         </div>
 
       </form>
 
     </div>
+
   </div>
 
 
-  <!-- BUDGET MODAL -->
+  <!-- =====================================================
+       BUDGET MODAL
+  ====================================================== -->
 
-  <div id="budget-modal" class="modal hidden">
+  <div
+    id="budget-modal"
+    class="modal hidden"
+    role="dialog"
+    aria-modal="true"
+  >
+
     <div class="modal-backdrop"></div>
+
 
     <div class="modal-card">
 
       <div class="modal-header">
+
         <div>
-          <p class="eyebrow">Планирование</p>
-          <h2>Месячный лимит</h2>
+
+          <p class="eyebrow">
+            Планирование
+          </p>
+
+          <h2>
+            Месячный лимит
+          </h2>
+
         </div>
 
-        <button class="close-button" data-close-modal="budget-modal">×</button>
+
+        <button
+          class="close-button"
+          data-close-modal="budget-modal"
+          type="button"
+          aria-label="Закрыть"
+        >
+          ×
+        </button>
+
       </div>
+
 
       <form id="budget-form">
 
         <label>
+
           Категория
-          <select id="budget-category" required></select>
+
+          <select
+            id="budget-category"
+            required
+          ></select>
+
         </label>
+
 
         <label>
+
           Лимит
-          <input id="budget-amount" type="number" min="1" step="1" required>
+
+          <input
+            id="budget-amount"
+            type="number"
+            min="1"
+            step="1"
+            inputmode="decimal"
+            placeholder="25000"
+            required
+          >
+
         </label>
 
+
         <div class="modal-actions">
-          <button class="secondary-button" type="button" data-close-modal="budget-modal">
+
+          <button
+            class="secondary-button"
+            type="button"
+            data-close-modal="budget-modal"
+          >
             Отмена
           </button>
 
-          <button class="primary-button" type="submit">
+
+          <button
+            class="primary-button"
+            type="submit"
+          >
             Сохранить
           </button>
+
         </div>
 
       </form>
 
     </div>
+
   </div>
 
 
-  <!-- MONTH MODAL -->
+  <!-- =====================================================
+       MONTH MODAL
+  ====================================================== -->
 
-  <div id="month-modal" class="modal hidden">
+  <div
+    id="month-modal"
+    class="modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="month-modal-title"
+  >
+
     <div class="modal-backdrop"></div>
+
 
     <div class="modal-card">
 
       <div class="modal-header">
-        <h2>Выбрать месяц</h2>
-        <button class="close-button" data-close-modal="month-modal">×</button>
+
+        <h2 id="month-modal-title">
+          Выбрать месяц
+        </h2>
+
+
+        <button
+          class="close-button"
+          data-close-modal="month-modal"
+          type="button"
+          aria-label="Закрыть"
+        >
+          ×
+        </button>
+
       </div>
 
+
       <label>
+
         Месяц
-        <input id="month-input" type="month">
+
+        <input
+          id="month-input"
+          type="month"
+        >
+
       </label>
 
+
       <div class="modal-actions">
-        <button id="month-save" class="primary-button" type="button">
+
+        <button
+          id="month-save"
+          class="primary-button"
+          type="button"
+        >
           Применить
         </button>
+
       </div>
 
     </div>
+
   </div>
 
 
-  <div id="toast-container"></div>
+  <!-- =====================================================
+       TOASTS
+  ====================================================== -->
+
+  <div
+    id="toast-container"
+    aria-live="polite"
+    aria-atomic="true"
+  ></div>
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- =======================================================
+     SCRIPTS
+======================================================= -->
+
+<script
+  src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+></script>
+
 <script src="config.js"></script>
 <script src="app.js"></script>
 

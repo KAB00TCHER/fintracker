@@ -1,6 +1,28 @@
-// app.js
-
 "use strict";
+
+/*
+  FinTracker
+  ----------
+  Основной клиентский слой приложения.
+
+  Текущий HTML остаётся совместимым:
+  - Supabase Auth
+  - transactions
+  - transaction_items
+  - categories
+  - merchants
+  - budgets
+  - profiles
+
+  Важный принцип:
+  transaction.category_id используется для обычной транзакции.
+  transaction_items.category_id используется для детализированной покупки.
+*/
+
+
+/* =========================================================
+   SUPABASE
+========================================================= */
 
 const { createClient } = window.supabase;
 
@@ -9,16 +31,16 @@ const supabaseClient = createClient(
   window.APP_CONFIG.SUPABASE_ANON_KEY
 );
 
-async function setTransactionCategoryFromItems() {
 
-  return null;
-}
 /* =========================================================
    STATE
 ========================================================= */
 
 const state = {
   user: null,
+
+  initialized: false,
+  enteringApp: false,
 
   currentPage: "dashboard",
 
@@ -28,13 +50,16 @@ const state = {
   categories: [],
   merchants: [],
   budgets: [],
-  items: [],
 
   transactionType: "expense",
-
   editingTransaction: null,
 
-  analyticsPeriod: "month"
+  analyticsPeriod: "month",
+
+  analyticsTransactions: [],
+
+  loading: false,
+  saving: false
 };
 
 
@@ -64,12 +89,32 @@ const ICONS = {
 
 
 /* =========================================================
-   DOM
+   DOM HELPERS
 ========================================================= */
 
 const $ = selector => document.querySelector(selector);
 
-const $$ = selector => [...document.querySelectorAll(selector)];
+const $$ = selector => [
+  ...document.querySelectorAll(selector)
+];
+
+
+function setText(selector, value) {
+  const element = $(selector);
+
+  if (element) {
+    element.textContent = value ?? "";
+  }
+}
+
+
+function setValue(selector, value) {
+  const element = $(selector);
+
+  if (element) {
+    element.value = value ?? "";
+  }
+}
 
 
 /* =========================================================
@@ -78,70 +123,183 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 
 document.addEventListener("DOMContentLoaded", init);
 
-async function init() {
-  setupEvents();
 
+async function init() {
+  if (state.initialized) {
+    return;
+  }
+
+  state.initialized = true;
+
+  setupEvents();
   setMonthUI();
 
-  const {
-    data: { session }
-  } = await supabaseClient.auth.getSession();
+  try {
+    const {
+      data: { session },
+      error
+    } = await supabaseClient.auth.getSession();
 
-  if (session?.user) {
-    await enterApp(session.user);
-  } else {
+    if (error) {
+      console.error(error);
+      showAuth();
+    } else if (session?.user) {
+      await enterApp(session.user);
+    } else {
+      showAuth();
+    }
+  } catch (error) {
+    console.error(error);
     showAuth();
   }
 
-  supabaseClient.auth.onAuthStateChange(async (event, session) => {
-    if (event === "SIGNED_IN" && session?.user) {
-      await enterApp(session.user);
-    }
+  supabaseClient.auth.onAuthStateChange(
+    async (event, session) => {
 
-    if (event === "SIGNED_OUT") {
-      showAuth();
+      if (
+        event === "SIGNED_IN" &&
+        session?.user
+      ) {
+        /*
+          SIGNED_IN может сработать сразу после getSession().
+          enterApp защищён от двойного запуска.
+        */
+        await enterApp(session.user);
+      }
+
+      if (event === "SIGNED_OUT") {
+        resetState();
+        showAuth();
+      }
     }
-  });
+  );
 }
 
 
 /* =========================================================
-   AUTH
+   AUTH UI
 ========================================================= */
 
 function showAuth() {
-  $("#auth-screen").classList.remove("hidden");
-  $("#main-screen").classList.add("hidden");
+  const auth = $("#auth-screen");
+  const main = $("#main-screen");
+
+  if (auth) {
+    auth.classList.remove("hidden");
+  }
+
+  if (main) {
+    main.classList.add("hidden");
+  }
 }
+
+
+function showMain() {
+  const auth = $("#auth-screen");
+  const main = $("#main-screen");
+
+  if (auth) {
+    auth.classList.add("hidden");
+  }
+
+  if (main) {
+    main.classList.remove("hidden");
+  }
+}
+
 
 async function enterApp(user) {
-  state.user = user;
+  if (!user) {
+    return;
+  }
 
-  $("#auth-screen").classList.add("hidden");
-  $("#main-screen").classList.remove("hidden");
+  if (
+    state.enteringApp &&
+    state.user?.id === user.id
+  ) {
+    return;
+  }
 
-  $("#user-email").textContent = user.email || "";
+  state.enteringApp = true;
 
-  await ensureUserProfile();
+  try {
+    state.user = user;
 
-  await loadReferenceData();
-  await loadMonthData();
+    showMain();
 
-  renderEverything();
+    setText(
+      "#user-email",
+      user.email || ""
+    );
+
+    await ensureUserProfile();
+
+    await loadReferenceData();
+    await loadMonthData();
+
+    renderEverything();
+  } catch (error) {
+    console.error(error);
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+  } finally {
+    state.enteringApp = false;
+  }
 }
 
+
+function resetState() {
+  state.user = null;
+
+  state.transactions = [];
+  state.categories = [];
+  state.merchants = [];
+  state.budgets = [];
+  state.analyticsTransactions = [];
+
+  state.editingTransaction = null;
+  state.transactionType = "expense";
+  state.currentPage = "dashboard";
+
+  closeAllModals();
+}
+
+
+/* =========================================================
+   PROFILE
+========================================================= */
+
 async function ensureUserProfile() {
-  const { error } = await supabaseClient
+  if (!state.user?.id) {
+    return;
+  }
+
+  const {
+    error
+  } = await supabaseClient
     .from("profiles")
-    .upsert({
-      id: state.user.id,
-      email: state.user.email
-    }, {
-      onConflict: "id"
-    });
+    .upsert(
+      {
+        id: state.user.id,
+        email: state.user.email
+      },
+      {
+        onConflict: "id"
+      }
+    );
+
+  /*
+    Профиль не должен ломать приложение.
+    Если RLS запрещает upsert — данные всё равно могут работать.
+  */
 
   if (error) {
-    console.error(error);
+    console.warn(
+      "Profile upsert:",
+      error.message
+    );
   }
 }
 
@@ -152,194 +310,423 @@ async function ensureUserProfile() {
 
 function setupEvents() {
 
-  /* AUTH */
+  /* -----------------------------------------
+     AUTH
+  ----------------------------------------- */
 
   $$(".auth-tab").forEach(button => {
-    button.addEventListener("click", () => {
-      const tab = button.dataset.authTab;
+    button.addEventListener(
+      "click",
+      () => {
 
-      $$(".auth-tab").forEach(x => x.classList.remove("active"));
-      button.classList.add("active");
+        const tab =
+          button.dataset.authTab;
 
-      $("#login-form").classList.toggle("hidden", tab !== "login");
-      $("#register-form").classList.toggle("hidden", tab !== "register");
+        $$(".auth-tab").forEach(
+          item =>
+            item.classList.remove("active")
+        );
 
-      $("#auth-message").textContent = "";
-    });
+        button.classList.add("active");
+
+        const loginForm =
+          $("#login-form");
+
+        const registerForm =
+          $("#register-form");
+
+        if (loginForm) {
+          loginForm.classList.toggle(
+            "hidden",
+            tab !== "login"
+          );
+        }
+
+        if (registerForm) {
+          registerForm.classList.toggle(
+            "hidden",
+            tab !== "register"
+          );
+        }
+
+        setAuthMessage("");
+      }
+    );
   });
 
 
-  $("#login-form").addEventListener("submit", login);
-
-  $("#register-form").addEventListener("submit", register);
-
-  $("#forgot-password").addEventListener("click", resetPassword);
-
-  $("#logout-button").addEventListener("click", async () => {
-    await supabaseClient.auth.signOut();
-  });
+  $("#login-form")?.addEventListener(
+    "submit",
+    login
+  );
 
 
-  /* NAVIGATION */
+  $("#register-form")?.addEventListener(
+    "submit",
+    register
+  );
+
+
+  $("#forgot-password")?.addEventListener(
+    "click",
+    resetPassword
+  );
+
+
+  $("#logout-button")?.addEventListener(
+    "click",
+    async () => {
+      await supabaseClient.auth.signOut();
+    }
+  );
+
+
+  /* -----------------------------------------
+     NAVIGATION
+  ----------------------------------------- */
 
   $$(".nav-button").forEach(button => {
-    button.addEventListener("click", () => {
-      navigate(button.dataset.page);
-    });
-  });
-
-  $$("[data-page]").forEach(button => {
-    button.addEventListener("click", () => {
-      if (button.dataset.page) {
+    button.addEventListener(
+      "click",
+      () => {
         navigate(button.dataset.page);
       }
-    });
+    );
   });
 
 
-  /* QUICK ACTIONS */
-
-  $("#quick-expense").addEventListener("click", () => {
-    openTransactionModal("expense");
-  });
-
-  $("#quick-income").addEventListener("click", () => {
-    openTransactionModal("income");
-  });
-
-  $("#transactions-add").addEventListener("click", () => {
-    openTransactionModal("expense");
-  });
-
-
-  /* USER MENU */
-
-  $("#user-menu-button").addEventListener("click", event => {
-    event.stopPropagation();
-    $("#user-menu").classList.toggle("hidden");
-  });
-
-  document.addEventListener("click", event => {
-    if (!event.target.closest("#user-menu") &&
-        !event.target.closest("#user-menu-button")) {
-      $("#user-menu").classList.add("hidden");
+  $$(".link-button[data-page]").forEach(
+    button => {
+      button.addEventListener(
+        "click",
+        () => {
+          navigate(button.dataset.page);
+        }
+      );
     }
-  });
+  );
 
 
-  /* MONTH */
+  /* -----------------------------------------
+     QUICK ACTIONS
+  ----------------------------------------- */
 
-  $("#month-picker-button").addEventListener("click", () => {
-    $("#month-input").value = state.selectedMonth;
-    openModal("month-modal");
-  });
-
-  $("#month-save").addEventListener("click", async () => {
-    state.selectedMonth = $("#month-input").value;
-
-    closeModal("month-modal");
-
-    setMonthUI();
-
-    await loadMonthData();
-    renderEverything();
-  });
-
-
-  /* TRANSACTION TYPE */
-
-  $$(".transaction-type").forEach(button => {
-    button.addEventListener("click", () => {
-      setTransactionType(button.dataset.transactionType);
-    });
-  });
-
-
-  /* TRANSACTION */
-
-  $("#transaction-form").addEventListener("submit", saveTransaction);
-
-  $("#add-item-button").addEventListener("click", addItemRow);
-
-  $("#transaction-items").addEventListener("input", updateItemsTotal);
-
-  $("#transaction-items").addEventListener("change", updateItemsTotal);
-
-  $("#transaction-items").addEventListener("click", event => {
-    const button = event.target.closest("[data-remove-item]");
-
-    if (!button) {
-      return;
+  $("#quick-expense")?.addEventListener(
+    "click",
+    () => {
+      openTransactionModal("expense");
     }
-
-    button.closest(".item-row").remove();
-
-    updateItemsTotal();
-  });
+  );
 
 
-  /* SEARCH */
-
-  $("#transaction-search").addEventListener("input", renderTransactions);
-
-  $("#transaction-type-filter").addEventListener("change", renderTransactions);
-
-  $("#transaction-category-filter").addEventListener("change", renderTransactions);
-
-
-  /* ANALYTICS */
-
-  $$(".period-button").forEach(button => {
-    button.addEventListener("click", async () => {
-
-      $$(".period-button").forEach(x => x.classList.remove("active"));
-      button.classList.add("active");
-
-      state.analyticsPeriod = button.dataset.period;
-
-      await renderAnalytics();
-    });
-  });
-
-
-  /* BUDGETS */
-
-  $("#add-budget-button").addEventListener("click", openBudgetModal);
-
-  $("#budget-form").addEventListener("submit", saveBudget);
-
-
-  /* SETTINGS */
-
-  $("#category-form").addEventListener("submit", addCategory);
-
-  $("#merchant-form").addEventListener("submit", addMerchant);
-
-
-  /* EXPORT */
-
-  $("#export-data").addEventListener("click", exportData);
-
-
-  /* CLOSE MODALS */
-
-  $$("[data-close-modal]").forEach(button => {
-    button.addEventListener("click", () => {
-      closeModal(button.dataset.closeModal);
-    });
-  });
-
-  $$(".modal-backdrop").forEach(backdrop => {
-    backdrop.addEventListener("click", () => {
-      backdrop.closest(".modal").classList.add("hidden");
-    });
-  });
-
-  document.addEventListener("keydown", event => {
-    if (event.key === "Escape") {
-      $$(".modal").forEach(modal => modal.classList.add("hidden"));
+  $("#quick-income")?.addEventListener(
+    "click",
+    () => {
+      openTransactionModal("income");
     }
-  });
+  );
+
+
+  $("#transactions-add")?.addEventListener(
+    "click",
+    () => {
+      openTransactionModal("expense");
+    }
+  );
+
+
+  /* -----------------------------------------
+     USER MENU
+  ----------------------------------------- */
+
+  $("#user-menu-button")?.addEventListener(
+    "click",
+    event => {
+      event.stopPropagation();
+
+      $("#user-menu")?.classList.toggle(
+        "hidden"
+      );
+    }
+  );
+
+
+  document.addEventListener(
+    "click",
+    event => {
+
+      const menu =
+        $("#user-menu");
+
+      const button =
+        $("#user-menu-button");
+
+      if (
+        menu &&
+        !event.target.closest("#user-menu") &&
+        !event.target.closest("#user-menu-button")
+      ) {
+        menu.classList.add("hidden");
+      }
+    }
+  );
+
+
+  /* -----------------------------------------
+     MONTH
+  ----------------------------------------- */
+
+  $("#month-picker-button")?.addEventListener(
+    "click",
+    () => {
+
+      setValue(
+        "#month-input",
+        state.selectedMonth
+      );
+
+      openModal("month-modal");
+    }
+  );
+
+
+  $("#month-save")?.addEventListener(
+    "click",
+    async () => {
+
+      const value =
+        $("#month-input")?.value;
+
+      if (!value) {
+        return;
+      }
+
+      state.selectedMonth = value;
+
+      closeModal("month-modal");
+
+      setMonthUI();
+
+      await reloadCurrentMonth();
+    }
+  );
+
+
+  /* -----------------------------------------
+     TRANSACTION TYPE
+  ----------------------------------------- */
+
+  $$(".transaction-type").forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+          setTransactionType(
+            button.dataset.transactionType
+          );
+        }
+      );
+
+    }
+  );
+
+
+  /* -----------------------------------------
+     TRANSACTION
+  ----------------------------------------- */
+
+  $("#transaction-form")?.addEventListener(
+    "submit",
+    saveTransaction
+  );
+
+
+  $("#add-item-button")?.addEventListener(
+    "click",
+    addItemRow
+  );
+
+
+  $("#transaction-items")?.addEventListener(
+    "input",
+    updateItemsTotal
+  );
+
+
+  $("#transaction-items")?.addEventListener(
+    "change",
+    updateItemsTotal
+  );
+
+
+  $("#transaction-items")?.addEventListener(
+    "click",
+    event => {
+
+      const button =
+        event.target.closest(
+          "[data-remove-item]"
+        );
+
+      if (!button) {
+        return;
+      }
+
+      const row =
+        button.closest(".item-row");
+
+      if (row) {
+        row.remove();
+      }
+
+      updateItemsTotal();
+    }
+  );
+
+
+  /* -----------------------------------------
+     SEARCH
+  ----------------------------------------- */
+
+  $("#transaction-search")?.addEventListener(
+    "input",
+    renderTransactions
+  );
+
+
+  $("#transaction-type-filter")?.addEventListener(
+    "change",
+    renderTransactions
+  );
+
+
+  $("#transaction-category-filter")?.addEventListener(
+    "change",
+    renderTransactions
+  );
+
+
+  /* -----------------------------------------
+     ANALYTICS
+  ----------------------------------------- */
+
+  $$(".period-button").forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        async () => {
+
+          $$(".period-button").forEach(
+            item =>
+              item.classList.remove("active")
+          );
+
+          button.classList.add("active");
+
+          state.analyticsPeriod =
+            button.dataset.period;
+
+          await renderAnalytics();
+        }
+      );
+
+    }
+  );
+
+
+  /* -----------------------------------------
+     BUDGETS
+  ----------------------------------------- */
+
+  $("#add-budget-button")?.addEventListener(
+    "click",
+    openBudgetModal
+  );
+
+
+  $("#budget-form")?.addEventListener(
+    "submit",
+    saveBudget
+  );
+
+
+  /* -----------------------------------------
+     SETTINGS
+  ----------------------------------------- */
+
+  $("#category-form")?.addEventListener(
+    "submit",
+    addCategory
+  );
+
+
+  $("#merchant-form")?.addEventListener(
+    "submit",
+    addMerchant
+  );
+
+
+  /* -----------------------------------------
+     EXPORT
+  ----------------------------------------- */
+
+  $("#export-data")?.addEventListener(
+    "click",
+    exportData
+  );
+
+
+  /* -----------------------------------------
+     MODALS
+  ----------------------------------------- */
+
+  $$("[data-close-modal]").forEach(
+    button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+          closeModal(
+            button.dataset.closeModal
+          );
+        }
+      );
+
+    }
+  );
+
+
+  $$(".modal-backdrop").forEach(
+    backdrop => {
+
+      backdrop.addEventListener(
+        "click",
+        () => {
+
+          const modal =
+            backdrop.closest(".modal");
+
+          if (modal) {
+            modal.classList.add("hidden");
+          }
+        }
+      );
+
+    }
+  );
+
+
+  document.addEventListener(
+    "keydown",
+    event => {
+
+      if (event.key === "Escape") {
+        closeAllModals();
+      }
+    }
+  );
 }
 
 
@@ -350,45 +737,90 @@ function setupEvents() {
 async function login(event) {
   event.preventDefault();
 
-  const email = $("#login-email").value.trim();
-  const password = $("#login-password").value;
+  const email =
+    $("#login-email")?.value.trim();
 
-  setAuthMessage("Выполняется вход...");
+  const password =
+    $("#login-password")?.value || "";
 
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
+  if (!email || !password) {
+    setAuthMessage(
+      "Введите почту и пароль."
+    );
+
+    return;
+  }
+
+  setAuthMessage(
+    "Выполняется вход..."
+  );
+
+  const {
+    error
+  } = await supabaseClient.auth
+    .signInWithPassword({
+      email,
+      password
+    });
 
   if (error) {
-    setAuthMessage(error.message);
+    setAuthMessage(
+      translateAuthError(error)
+    );
+
     return;
   }
 
   setAuthMessage("");
 }
 
+
 async function register(event) {
   event.preventDefault();
 
-  const email = $("#register-email").value.trim();
-  const password = $("#register-password").value;
-  const confirm = $("#register-password-confirm").value;
+  const email =
+    $("#register-email")?.value.trim();
+
+  const password =
+    $("#register-password")?.value || "";
+
+  const confirm =
+    $("#register-password-confirm")?.value || "";
 
   if (password !== confirm) {
-    setAuthMessage("Пароли не совпадают.");
+    setAuthMessage(
+      "Пароли не совпадают."
+    );
+
     return;
   }
 
-  setAuthMessage("Создаём аккаунт...");
+  if (password.length < 6) {
+    setAuthMessage(
+      "Пароль должен содержать минимум 6 символов."
+    );
 
-  const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password
-  });
+    return;
+  }
+
+  setAuthMessage(
+    "Создаём аккаунт..."
+  );
+
+  const {
+    data,
+    error
+  } = await supabaseClient.auth
+    .signUp({
+      email,
+      password
+    });
 
   if (error) {
-    setAuthMessage(error.message);
+    setAuthMessage(
+      translateAuthError(error)
+    );
+
     return;
   }
 
@@ -401,28 +833,85 @@ async function register(event) {
   }
 }
 
+
 async function resetPassword() {
-  const email = $("#login-email").value.trim();
+  const email =
+    $("#login-email")?.value.trim();
 
   if (!email) {
-    setAuthMessage("Сначала укажите почту.");
+    setAuthMessage(
+      "Сначала укажите почту."
+    );
+
     return;
   }
 
-  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin
-  });
+  const {
+    error
+  } = await supabaseClient.auth
+    .resetPasswordForEmail(
+      email,
+      {
+        redirectTo:
+          window.location.origin
+      }
+    );
 
   if (error) {
-    setAuthMessage(error.message);
+    setAuthMessage(
+      translateAuthError(error)
+    );
+
     return;
   }
 
-  setAuthMessage("Письмо для восстановления отправлено.");
+  setAuthMessage(
+    "Письмо для восстановления отправлено."
+  );
 }
 
+
 function setAuthMessage(message) {
-  $("#auth-message").textContent = message;
+  setText(
+    "#auth-message",
+    message
+  );
+}
+
+
+function translateAuthError(error) {
+  const message =
+    error?.message || "";
+
+  const lower =
+    message.toLowerCase();
+
+  if (
+    lower.includes("invalid login credentials")
+  ) {
+    return "Неверная почта или пароль.";
+  }
+
+  if (
+    lower.includes("user already registered")
+  ) {
+    return "Пользователь с такой почтой уже зарегистрирован.";
+  }
+
+  if (
+    lower.includes("email not confirmed")
+  ) {
+    return "Почта ещё не подтверждена.";
+  }
+
+  if (
+    lower.includes("password")
+  ) {
+    return "Пароль не соответствует требованиям.";
+  }
+
+  return message ||
+    "Не удалось выполнить операцию.";
 }
 
 
@@ -431,33 +920,48 @@ function setAuthMessage(message) {
 ========================================================= */
 
 async function navigate(page) {
+  if (!page) {
+    return;
+  }
+
   state.currentPage = page;
 
-  $$(".page").forEach(element => {
-    element.classList.toggle(
-      "active",
-      element.id === `page-${page}`
-    );
-  });
+  $$(".page").forEach(
+    element => {
 
-  $$(".nav-button").forEach(button => {
-    button.classList.toggle(
-      "active",
-      button.dataset.page === page
-    );
-  });
+      element.classList.toggle(
+        "active",
+        element.id === `page-${page}`
+      );
+    }
+  );
+
+
+  $$(".nav-button").forEach(
+    button => {
+
+      button.classList.toggle(
+        "active",
+        button.dataset.page === page
+      );
+    }
+  );
+
 
   if (page === "analytics") {
     await renderAnalytics();
   }
 
+
   if (page === "budgets") {
     renderBudgets();
   }
 
+
   if (page === "settings") {
     renderSettings();
   }
+
 
   window.scrollTo({
     top: 0,
@@ -467,15 +971,14 @@ async function navigate(page) {
 
 
 /* =========================================================
-   DATA LOADING
+   DATA
 ========================================================= */
 
 async function loadReferenceData() {
 
   const [
     categoriesResult,
-    merchantsResult,
-    budgetsResult
+    merchantsResult
   ] = await Promise.all([
 
     supabaseClient
@@ -486,69 +989,50 @@ async function loadReferenceData() {
     supabaseClient
       .from("merchants")
       .select("*")
-      .order("name"),
-
-    supabaseClient
-      .from("budgets")
-      .select("*")
-      .eq("month", state.selectedMonth)
-      .order("amount", { ascending: false })
+      .order("name")
   ]);
 
 
   if (categoriesResult.error) {
-    handleDbError(categoriesResult.error);
-    return;
+    throw categoriesResult.error;
   }
+
 
   if (merchantsResult.error) {
-    handleDbError(merchantsResult.error);
-    return;
-  }
-
-  if (budgetsResult.error) {
-    handleDbError(budgetsResult.error);
-    return;
+    throw merchantsResult.error;
   }
 
 
-  state.categories = categoriesResult.data || [];
-  state.merchants = merchantsResult.data || [];
-  state.budgets = budgetsResult.data || [];
+  state.categories =
+    categoriesResult.data || [];
+
+  state.merchants =
+    merchantsResult.data || [];
 }
+
 
 async function loadMonthData() {
 
-  const [year, month] =
-    state.selectedMonth
-      .split("-")
-      .map(Number);
+  const range =
+    getMonthRange(
+      state.selectedMonth
+    );
 
 
-  const start =
-    `${year}-${pad(month)}-01`;
+  const [
+    transactionsResult,
+    budgetsResult
+  ] = await Promise.all([
 
-
-  const lastDay =
-    new Date(
-      year,
-      month,
-      0
-    ).getDate();
-
-
-  const end =
-    `${year}-${pad(month)}-${pad(lastDay)}`;
-
-
-  const {
-    data,
-    error
-  } =
-    await supabaseClient
+    supabaseClient
       .from("transactions")
       .select(`
         *,
+        category:categories (
+          id,
+          name,
+          type
+        ),
         transaction_items (
           id,
           name,
@@ -559,64 +1043,152 @@ async function loadMonthData() {
             name,
             type
           )
-        ),
+        )
+      `)
+      .gte("date", range.start)
+      .lte("date", range.end)
+      .order("date", {
+        ascending: false
+      })
+      .order("created_at", {
+        ascending: false
+      }),
+
+    supabaseClient
+      .from("budgets")
+      .select(`
+        *,
         category:categories (
           id,
           name,
           type
         )
       `)
-      .gte("date", start)
-      .lte("date", end)
-      .order("date", {
-        ascending: false
-      })
-      .order("created_at", {
-        ascending: false
-      });
-
-
-  if (error) {
-    handleDbError(error);
-    return;
-  }
-
-
-  state.transactions =
-    data || [];
-
-
-  state.items =
-    state.transactions.flatMap(
-      transaction =>
-        transaction.transaction_items || []
-    );
-
-
-  const {
-    data: budgets,
-    error: budgetError
-  } =
-    await supabaseClient
-      .from("budgets")
-      .select("*")
       .eq(
         "month",
         state.selectedMonth
       )
       .order("amount", {
         ascending: false
-      });
+      })
+  ]);
 
 
-  if (budgetError) {
-    handleDbError(budgetError);
-    return;
+  if (transactionsResult.error) {
+    throw transactionsResult.error;
   }
 
 
+  if (budgetsResult.error) {
+    throw budgetsResult.error;
+  }
+
+
+  state.transactions =
+    transactionsResult.data || [];
+
   state.budgets =
-    budgets || [];
+    budgetsResult.data || [];
+}
+
+
+async function reloadCurrentMonth() {
+  try {
+    setLoading(true);
+
+    await loadMonthData();
+
+    renderEverything();
+  } catch (error) {
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+  } finally {
+    setLoading(false);
+  }
+}
+
+
+/* =========================================================
+   ALL-TIME DATA
+========================================================= */
+
+async function fetchAllTransactions() {
+
+  /*
+    Supabase JS обычно возвращает до 1000 строк.
+    Поэтому используем range-пагинацию.
+  */
+
+  const PAGE_SIZE = 1000;
+
+  let offset = 0;
+  let all = [];
+
+  while (true) {
+
+    const {
+      data,
+      error
+    } = await supabaseClient
+      .from("transactions")
+      .select(`
+        *,
+        category:categories (
+          id,
+          name,
+          type
+        ),
+        transaction_items (
+          id,
+          name,
+          amount,
+          category_id,
+          category:categories (
+            id,
+            name,
+            type
+          )
+        )
+      `)
+      .order("date", {
+        ascending: false
+      })
+      .order("created_at", {
+        ascending: false
+      })
+      .range(
+        offset,
+        offset + PAGE_SIZE - 1
+      );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    const rows =
+      data || [];
+
+    all =
+      all.concat(rows);
+
+
+    if (
+      rows.length < PAGE_SIZE
+    ) {
+      break;
+    }
+
+
+    offset += PAGE_SIZE;
+  }
+
+  return all;
 }
 
 
@@ -628,6 +1200,7 @@ function renderEverything() {
   setMonthUI();
 
   populateCategoryFilters();
+  populateBudgetCategories();
   populateMerchantOptions();
 
   renderDashboard();
@@ -643,30 +1216,79 @@ function renderEverything() {
 
 function renderDashboard() {
 
-  const income = sum(
-    state.transactions
-      .filter(x => x.type === "income")
-      .map(x => Number(x.amount))
+  const income =
+    sum(
+      state.transactions
+        .filter(
+          transaction =>
+            transaction.type === "income"
+        )
+        .map(
+          transaction =>
+            Number(transaction.amount)
+        )
+    );
+
+
+  const expenses =
+    sum(
+      state.transactions
+        .filter(
+          transaction =>
+            transaction.type === "expense"
+        )
+        .map(
+          transaction =>
+            Number(transaction.amount)
+        )
+    );
+
+
+  /*
+    Баланс должен быть настоящим балансом,
+    поэтому он рассчитывается по всей истории.
+  */
+
+  calculateAllTimeBalance()
+    .then(balance => {
+      setText(
+        "#balance-value",
+        money(balance)
+      );
+    })
+    .catch(error => {
+      console.error(error);
+    });
+
+
+  const remaining =
+    income - expenses;
+
+
+  setText(
+    "#income-value",
+    money(income)
   );
 
-  const expenses = sum(
-    state.transactions
-      .filter(x => x.type === "expense")
-      .map(x => Number(x.amount))
+
+  setText(
+    "#expense-value",
+    money(expenses)
   );
 
-  const balance = calculateAllTimeBalance();
 
-  const remaining = income - expenses;
+  setText(
+    "#remaining-value",
+    money(remaining)
+  );
 
 
-  $("#balance-value").textContent = money(balance);
-
-  $("#income-value").textContent = money(income);
-
-  $("#expense-value").textContent = money(expenses);
-
-  $("#remaining-value").textContent = money(remaining);
+  setText(
+    "#dashboard-month-title",
+    formatMonthTitle(
+      state.selectedMonth
+    )
+  );
 
 
   renderCategoryOverview();
@@ -677,117 +1299,157 @@ function renderDashboard() {
 }
 
 
-function calculateAllTimeBalance() {
+async function calculateAllTimeBalance() {
 
-  const income = state.transactions
-    .filter(x => x.type === "income")
-    .reduce(
-      (total, item) => total + Number(item.amount),
-      0
-    );
+  const transactions =
+    await fetchAllTransactions();
 
-  const expense = state.transactions
-    .filter(x => x.type === "expense")
-    .reduce(
-      (total, item) => total + Number(item.amount),
-      0
-    );
 
-  return income - expense;
+  return transactions.reduce(
+    (total, transaction) => {
+
+      const amount =
+        Number(transaction.amount) || 0;
+
+      if (
+        transaction.type === "income"
+      ) {
+        return total + amount;
+      }
+
+      return total - amount;
+    },
+    0
+  );
 }
 
 
+/* =========================================================
+   CATEGORY OVERVIEW
+========================================================= */
+
 function renderCategoryOverview() {
 
-  const container = $("#category-overview");
+  const container =
+    $("#category-overview");
 
-  const grouped = groupExpensesByCategory();
-
-  if (!grouped.length) {
-    container.innerHTML = emptyState("В этом месяце расходов пока нет.");
+  if (!container) {
     return;
   }
 
-  const total = grouped.reduce(
-    (sum, item) => sum + item.amount,
-    0
-  );
 
-  container.innerHTML = grouped
-    .slice(0, 7)
-    .map(item => {
+  const expenses =
+    state.transactions.filter(
+      transaction =>
+        transaction.type === "expense"
+    );
 
-      const percent = total
-        ? Math.round(item.amount / total * 100)
-        : 0;
 
-      return `
-        <div class="category-row">
-          <div class="category-main">
-            <div class="category-name">
-              <span>${escapeHtml(item.name)}</span>
-              <span>${money(item.amount)} · ${percent}%</span>
+  if (!expenses.length) {
+    container.innerHTML =
+      emptyState(
+        "В этом месяце расходов пока нет."
+      );
+
+    return;
+  }
+
+
+  const groups =
+    aggregateCategories(expenses);
+
+
+  const total =
+    sum(
+      expenses.map(
+        transaction =>
+          Number(transaction.amount)
+      )
+    );
+
+
+  const rows =
+    [...groups.entries()]
+      .sort(
+        (a, b) =>
+          b[1] - a[1]
+      )
+      .slice(0, 8);
+
+
+  container.innerHTML =
+    rows.map(
+      ([name, amount]) => {
+
+        const percent =
+          total > 0
+            ? Math.round(
+                amount / total * 100
+              )
+            : 0;
+
+        return `
+          <div class="category-row">
+
+            <div class="category-main">
+
+              <div class="category-name">
+                <span>${escapeHtml(name)}</span>
+                <span>${money(amount)}</span>
+              </div>
+
+              <div class="progress">
+                <div
+                  class="progress-bar"
+                  style="width:${percent}%"
+                ></div>
+              </div>
+
             </div>
 
-            <div class="progress">
-              <div
-                class="progress-bar"
-                style="width:${percent}%"
-              ></div>
-            </div>
           </div>
-        </div>
-      `;
-    })
+        `;
+      }
+    )
     .join("");
 }
 
 
-function groupExpensesByCategory() {
+/* =========================================================
+   RECENT TRANSACTIONS
+========================================================= */
 
-  const map = new Map();
+function renderRecentTransactions() {
 
-  for (const transaction of state.transactions) {
+  const container =
+    $("#recent-transactions");
 
-    if (transaction.type !== "expense") {
-      continue;
-    }
-
-    const items = transaction.transaction_items || [];
-
-    if (!items.length) {
-
-      const name =
-        transaction.category?.name ||
-        "Без категории";
-
-      map.set(
-        name,
-        (map.get(name) || 0) + Number(transaction.amount)
-      );
-
-      continue;
-    }
-
-    for (const item of items) {
-
-      const name =
-        item.category?.name ||
-        "Без категории";
-
-      map.set(
-        name,
-        (map.get(name) || 0) + Number(item.amount)
-      );
-    }
+  if (!container) {
+    return;
   }
 
-  return [...map.entries()]
-    .map(([name, amount]) => ({
-      name,
-      amount
-    }))
-    .sort((a, b) => b.amount - a.amount);
+
+  const rows =
+    state.transactions
+      .slice(0, 7);
+
+
+  if (!rows.length) {
+    container.innerHTML =
+      emptyState(
+        "Операций пока нет."
+      );
+
+    return;
+  }
+
+
+  container.innerHTML =
+    rows
+      .map(
+        renderTransactionRow
+      )
+      .join("");
 }
 
 
@@ -795,171 +1457,187 @@ function groupExpensesByCategory() {
    TRANSACTIONS
 ========================================================= */
 
-function renderRecentTransactions() {
-
-  const container = $("#recent-transactions");
-
-  const transactions = state.transactions.slice(0, 6);
-
-  renderTransactionList(container, transactions);
-}
-
-
 function renderTransactions() {
 
-  const container = $("#all-transactions");
+  const container =
+    $("#all-transactions");
 
   if (!container) {
     return;
   }
 
-  const search = $("#transaction-search")
-    .value
-    .trim()
-    .toLowerCase();
 
-  const type = $("#transaction-type-filter").value;
-
-  const category = $("#transaction-category-filter").value;
-
-
-  const filtered = state.transactions.filter(transaction => {
-
-    if (type !== "all" && transaction.type !== type) {
-      return false;
-    }
-
-    if (
-      category !== "all" &&
-      transaction.category_id !== category
-    ) {
-      return false;
-    }
-
-    if (!search) {
-      return true;
-    }
-
-    const haystack = [
-      transaction.merchant,
-      transaction.income_source,
-      transaction.comment,
-      transaction.category?.name,
-      ...(transaction.transaction_items || []).map(x => x.name)
-    ]
-      .filter(Boolean)
-      .join(" ")
+  const search =
+    (
+      $("#transaction-search")
+        ?.value || ""
+    )
+      .trim()
       .toLowerCase();
 
-    return haystack.includes(search);
-  });
+
+  const type =
+    $("#transaction-type-filter")
+      ?.value || "all";
 
 
-  renderTransactionList(container, filtered);
-}
+  const category =
+    $("#transaction-category-filter")
+      ?.value || "all";
 
 
-function renderTransactionList(container, transactions) {
+  let transactions =
+    state.transactions.filter(
+      transaction => {
+
+        if (
+          type !== "all" &&
+          transaction.type !== type
+        ) {
+          return false;
+        }
+
+
+        if (
+          category !== "all" &&
+          !transactionMatchesCategory(
+            transaction,
+            category
+          )
+        ) {
+          return false;
+        }
+
+
+        if (!search) {
+          return true;
+        }
+
+
+        return transactionSearchText(
+          transaction
+        )
+          .toLowerCase()
+          .includes(search);
+      }
+    );
+
 
   if (!transactions.length) {
-    container.innerHTML = emptyState("Операций не найдено.");
+    container.innerHTML =
+      emptyState(
+        "Ничего не найдено."
+      );
+
     return;
   }
 
 
-  container.innerHTML = transactions
-    .map(transaction => {
-
-      const isIncome = transaction.type === "income";
-
-      const title =
-        isIncome
-          ? transaction.income_source || "Доход"
-          : transaction.merchant || "Расход";
-
-      const itemNames =
-        (transaction.transaction_items || [])
-          .map(item => item.name)
-          .slice(0, 3)
-          .join(", ");
-
-      const subtitle = [
-        formatDateHuman(transaction.date),
-        transaction.category?.name,
-        itemNames
-      ]
-        .filter(Boolean)
-        .join(" · ");
+  container.innerHTML =
+    transactions
+      .map(
+        renderTransactionRow
+      )
+      .join("");
+}
 
 
-      return `
-        <div class="transaction-row">
+function renderTransactionRow(transaction) {
 
-          <div class="transaction-icon">
-            ${isIncome ? "+" : "−"}
-          </div>
+  const isIncome =
+    transaction.type === "income";
 
-          <div>
-            <div class="transaction-title">
-              ${escapeHtml(title)}
-            </div>
 
-            <div class="transaction-subtitle">
-              ${escapeHtml(subtitle)}
-            </div>
-          </div>
+  const merchant =
+    transaction.merchant ||
+    transaction.income_source ||
+    "Без названия";
 
-          <div class="transaction-amount ${transaction.type}">
-            ${isIncome ? "+" : "−"}${money(transaction.amount)}
-          </div>
 
-          <div class="transaction-actions">
+  const category =
+    getTransactionCategoryName(
+      transaction
+    );
 
-            <button
-              class="icon-button"
-              data-edit-transaction="${transaction.id}"
-              title="Редактировать"
-            >✎</button>
 
-            <button
-              class="icon-button"
-              data-delete-transaction="${transaction.id}"
-              title="Удалить"
-            >×</button>
+  const date =
+    formatDate(
+      transaction.date
+    );
 
-          </div>
 
+  const amount =
+    Number(transaction.amount) || 0;
+
+
+  const sign =
+    isIncome
+      ? "+"
+      : "−";
+
+
+  return `
+    <div
+      class="transaction-row"
+      data-transaction-id="${escapeHtml(
+        transaction.id
+      )}"
+    >
+
+      <div class="transaction-icon">
+        ${ICONS[transaction.type] || "•"}
+      </div>
+
+      <div>
+        <div class="transaction-title">
+          ${escapeHtml(merchant)}
         </div>
-      `;
-    })
-    .join("");
 
+        <div class="transaction-subtitle">
+          ${escapeHtml(category)}
+          ${category && date ? " · " : ""}
+          ${escapeHtml(date)}
+        </div>
+      </div>
 
-  container
-    .querySelectorAll("[data-edit-transaction]")
-    .forEach(button => {
-      button.addEventListener("click", () => {
-        const transaction = state.transactions.find(
-          x => x.id === button.dataset.editTransaction
-        );
+      <div class="transaction-amount ${isIncome ? "income" : "expense"}">
+        ${sign}${money(amount)}
+      </div>
 
-        if (transaction) {
-          openTransactionModal(
-            transaction.type,
-            transaction
-          );
-        }
-      });
-    });
+      <div class="transaction-actions">
 
+        <button
+          class="icon-button"
+          type="button"
+          title="Изменить"
+          data-edit-transaction="${escapeHtml(
+            transaction.id
+          )}"
+          onclick="editTransaction('${escapeJs(
+            transaction.id
+          )}')"
+        >
+          ✎
+        </button>
 
-  container
-    .querySelectorAll("[data-delete-transaction]")
-    .forEach(button => {
-      button.addEventListener("click", () => {
-        deleteTransaction(button.dataset.deleteTransaction);
-      });
-    });
+        <button
+          class="icon-button"
+          type="button"
+          title="Удалить"
+          data-delete-transaction="${escapeHtml(
+            transaction.id
+          )}"
+          onclick="deleteTransaction('${escapeJs(
+            transaction.id
+          )}')"
+        >
+          ×
+        </button>
+
+      </div>
+
+    </div>
+  `;
 }
 
 
@@ -967,223 +1645,421 @@ function renderTransactionList(container, transactions) {
    TRANSACTION MODAL
 ========================================================= */
 
-function openTransactionModal(type = "expense", transaction = null) {
+function openTransactionModal(
+  type = "expense",
+  transaction = null
+) {
 
-  state.editingTransaction = transaction;
+  state.transactionType =
+    type;
 
-  $("#transaction-id").value =
-    transaction?.id || "";
-
-  $("#transaction-amount").value =
-    transaction?.amount || "";
-
-  $("#transaction-date").value =
-    transaction?.date ||
-    formatDate(new Date());
-
-  $("#transaction-merchant").value =
-    transaction?.merchant || "";
-
-  $("#transaction-income-source").value =
-    transaction?.income_source || "";
-
-  $("#transaction-comment").value =
-    transaction?.comment || "";
-
-  $("#transaction-items").innerHTML = "";
-
-  state.items = [];
+  state.editingTransaction =
+    transaction;
 
 
-  setTransactionType(type);
+  resetTransactionForm();
 
 
-  if (
-    transaction?.type === "expense" &&
-    transaction.transaction_items?.length
-  ) {
+  if (transaction) {
+    fillTransactionForm(
+      transaction
+    );
+  } else {
 
-    for (const item of transaction.transaction_items) {
-      addItemRow(item);
-    }
+    setTransactionType(type);
 
-  } else if (!transaction) {
-
-    addItemRow();
+    setValue(
+      "#transaction-date",
+      transactionDateForNewTransaction()
+    );
 
   }
 
 
+  openModal(
+    "transaction-modal"
+  );
+}
+
+
+function resetTransactionForm() {
+
+  const form =
+    $("#transaction-form");
+
+  if (form) {
+    form.reset();
+  }
+
+
+  setValue(
+    "#transaction-id",
+    ""
+  );
+
+
+  const items =
+    $("#transaction-items");
+
+  if (items) {
+    items.innerHTML = "";
+  }
+
+
+  setText(
+    "#items-total",
+    "0 ₽"
+  );
+
+
+  setText(
+    "#items-validation",
+    ""
+  );
+
+
+  setTransactionType(
+    "expense"
+  );
+}
+
+
+function fillTransactionForm(
+  transaction
+) {
+
+  setTransactionType(
+    transaction.type
+  );
+
+
+  setValue(
+    "#transaction-id",
+    transaction.id
+  );
+
+
+  setValue(
+    "#transaction-amount",
+    transaction.amount
+  );
+
+
+  setValue(
+    "#transaction-date",
+    transaction.date
+  );
+
+
+  setValue(
+    "#transaction-merchant",
+    transaction.merchant || ""
+  );
+
+
+  setValue(
+    "#transaction-income-source",
+    transaction.income_source || ""
+  );
+
+
+  setValue(
+    "#transaction-comment",
+    transaction.comment || ""
+  );
+
+
+  const container =
+    $("#transaction-items");
+
+  if (!container) {
+    return;
+  }
+
+
+  container.innerHTML = "";
+
+
+  if (
+    transaction.type === "expense" &&
+    Array.isArray(
+      transaction.transaction_items
+    )
+  ) {
+
+    transaction.transaction_items
+      .forEach(
+        item => {
+          addItemRow(item);
+        }
+      );
+  }
+
+
   updateItemsTotal();
-
-  $("#transaction-modal-eyebrow").textContent =
-    transaction
-      ? "Редактирование"
-      : "Новая операция";
-
-  $("#transaction-modal-title").textContent =
-    type === "income"
-      ? "Доход"
-      : "Расход";
-
-  openModal("transaction-modal");
 }
 
 
 function setTransactionType(type) {
 
-  state.transactionType = type;
-
-  $$(".transaction-type").forEach(button => {
-    button.classList.toggle(
-      "active",
-      button.dataset.transactionType === type
-    );
-  });
-
-
-  $$(".expense-only").forEach(element => {
-    element.classList.toggle(
-      "hidden",
-      type !== "expense"
-    );
-  });
-
-
-  $$(".income-only").forEach(element => {
-    element.classList.toggle(
-      "hidden",
-      type !== "income"
-    );
-  });
-
-
-  $("#transaction-modal-title").textContent =
+  state.transactionType =
     type === "income"
-      ? "Доход"
-      : "Расход";
+      ? "income"
+      : "expense";
 
-  updateItemsTotal();
+
+  $$(".transaction-type").forEach(
+    button => {
+
+      button.classList.toggle(
+        "active",
+        button.dataset.transactionType ===
+          state.transactionType
+      );
+    }
+  );
+
+
+  $$(".expense-only").forEach(
+    element => {
+
+      element.classList.toggle(
+        "hidden",
+        state.transactionType !==
+          "expense"
+      );
+    }
+  );
+
+
+  $$(".income-only").forEach(
+    element => {
+
+      element.classList.toggle(
+        "hidden",
+        state.transactionType !==
+          "income"
+      );
+    }
+  );
+
+
+  setText(
+    "#transaction-modal-title",
+    state.transactionType === "income"
+      ? "Доход"
+      : "Расход"
+  );
 }
 
 
+/* =========================================================
+   ITEM ROWS
+========================================================= */
+
 function addItemRow(item = null) {
 
-  const row = document.createElement("div");
+  const container =
+    $("#transaction-items");
 
-  row.className = "item-row";
+  if (!container) {
+    return;
+  }
+
+
+  const row =
+    document.createElement("div");
+
+  row.className =
+    "item-row";
+
+
+  const itemName =
+    item?.name || "";
+
+
+  const itemAmount =
+    item?.amount ?? "";
+
+
+  const itemCategory =
+    item?.category_id || "";
+
 
   row.innerHTML = `
+    <input
+      class="item-name"
+      type="text"
+      placeholder="Название товара"
+      value="${escapeHtmlAttribute(
+        itemName
+      )}"
+    >
 
-    <label>
-      Товар
-      <input
-        class="item-name"
-        placeholder="Например, мясо"
-        value="${escapeAttribute(item?.name || "")}"
-        required
-      >
-    </label>
+    <input
+      class="item-amount"
+      type="number"
+      min="0"
+      step="0.01"
+      placeholder="0"
+      value="${escapeHtmlAttribute(
+        itemAmount
+      )}"
+    >
 
-    <label>
-      Сумма
-      <input
-        class="item-amount"
-        type="number"
-        min="0.01"
-        step="0.01"
-        placeholder="0"
-        value="${item?.amount || ""}"
-        required
-      >
-    </label>
+    <select class="item-category">
+      <option value="">
+        Без категории
+      </option>
 
-    <label class="item-category">
-      Категория
-      <select class="item-category-select">
-        ${renderCategoryOptions(
-          "expense",
-          item?.category_id || ""
-        )}
-      </select>
-    </label>
+      ${expenseCategories()
+        .map(
+          category => `
+            <option
+              value="${escapeHtmlAttribute(
+                category.id
+              )}"
+              ${
+                category.id === itemCategory
+                  ? "selected"
+                  : ""
+              }
+            >
+              ${escapeHtml(
+                category.name
+              )}
+            </option>
+          `
+        )
+        .join("")}
+    </select>
 
     <button
       class="icon-button"
       type="button"
       data-remove-item
-      title="Удалить"
-    >×</button>
-
+      title="Удалить позицию"
+    >
+      ×
+    </button>
   `;
 
-  $("#transaction-items").appendChild(row);
+
+  container.appendChild(row);
 
   updateItemsTotal();
 }
 
 
+function getFormItems() {
+
+  const rows =
+    $$("#transaction-items .item-row");
+
+
+  return rows.map(row => {
+
+    const name =
+      row.querySelector(
+        ".item-name"
+      )?.value.trim() || "";
+
+
+    const amount =
+      Number(
+        row.querySelector(
+          ".item-amount"
+        )?.value || 0
+      );
+
+
+    const categoryId =
+      row.querySelector(
+        ".item-category"
+      )?.value || null;
+
+
+    return {
+      name,
+      amount,
+      category_id: categoryId
+    };
+  });
+}
+
+
 function updateItemsTotal() {
 
-  const rows = $$("#transaction-items .item-row");
+  const items =
+    getFormItems();
 
-  let total = 0;
 
-  rows.forEach(row => {
-    total += Number(
-      row.querySelector(".item-amount")?.value || 0
+  const total =
+    sum(
+      items.map(
+        item =>
+          Number(item.amount) || 0
+      )
     );
-  });
-
-  $("#items-total").textContent = money(total);
-
-  const transactionAmount =
-    Number($("#transaction-amount").value || 0);
 
 
-  const validation = $("#items-validation");
+  setText(
+    "#items-total",
+    money(total)
+  );
 
-  if (state.transactionType !== "expense" || !rows.length) {
-    validation.textContent = "";
-    validation.className = "validation-message";
+
+  const amount =
+    Number(
+      $("#transaction-amount")
+        ?.value || 0
+    );
+
+
+  const validation =
+    $("#items-validation");
+
+
+  if (!validation) {
     return;
   }
 
 
-  if (!transactionAmount) {
+  if (!items.length) {
     validation.textContent = "";
-    validation.className = "validation-message";
     return;
   }
 
 
   const difference =
-    Math.round((total - transactionAmount) * 100) / 100;
+    roundMoney(
+      amount - total
+    );
 
 
-  if (difference === 0) {
+  if (
+    Math.abs(difference) < 0.01
+  ) {
 
     validation.textContent =
-      "Состав покупки совпадает с общей суммой.";
+      "Сумма позиций совпадает.";
 
-    validation.className =
-      "validation-message success";
+    validation.classList.remove(
+      "error"
+    );
 
   } else {
 
     validation.textContent =
-      `Состав отличается на ${money(Math.abs(difference))}.`;
+      `Не сходится на ${money(
+        Math.abs(difference)
+      )}.`;
 
-    validation.className =
-      "validation-message error";
+    validation.classList.add(
+      "error"
+    );
   }
 }
-
-
-$("#transaction-amount")?.addEventListener(
-  "input",
-  updateItemsTotal
-);
 
 
 /* =========================================================
@@ -1191,273 +2067,469 @@ $("#transaction-amount")?.addEventListener(
 ========================================================= */
 
 async function saveTransaction(event) {
-
   event.preventDefault();
 
-  const id =
-    $("#transaction-id").value || null;
+  if (state.saving) {
+    return;
+  }
+
 
   const type =
     state.transactionType;
 
+
   const amount =
-    Number($("#transaction-amount").value);
+    roundMoney(
+      Number(
+        $("#transaction-amount")
+          ?.value || 0
+      )
+    );
+
 
   const date =
-    $("#transaction-date").value;
-
-  const merchant =
-    $("#transaction-merchant").value.trim() || null;
-
-  const incomeSource =
-    $("#transaction-income-source").value.trim() || null;
-
-  const comment =
-    $("#transaction-comment").value.trim() || null;
+    $("#transaction-date")
+      ?.value;
 
 
-  if (!amount || amount <= 0) {
-    toast("Укажите сумму.");
+  if (
+    !amount ||
+    amount <= 0
+  ) {
+
+    showToast(
+      "Введите сумму.",
+      "error"
+    );
+
     return;
   }
 
 
   if (!date) {
-    toast("Укажите дату.");
+    showToast(
+      "Укажите дату.",
+      "error"
+    );
+
     return;
   }
 
 
-  let items = [];
+  const items =
+    type === "expense"
+      ? getFormItems()
+      : [];
 
 
-  if (type === "expense") {
+  /*
+    Позиции должны иметь название.
+  */
 
-    const rows =
-      $$("#transaction-items .item-row");
-
-
-    for (const row of rows) {
-
-      const name =
-        row.querySelector(".item-name")
-          .value
-          .trim();
-
-      const itemAmount =
-        Number(
-          row.querySelector(".item-amount")
-            .value
-        );
-
-      const categoryId =
-        row.querySelector(
-          ".item-category-select"
-        ).value || null;
+  const invalidItem =
+    items.find(
+      item =>
+        !item.name ||
+        !Number.isFinite(
+          item.amount
+        ) ||
+        item.amount <= 0
+    );
 
 
-      if (!name || !itemAmount) {
-        toast("Заполните позицию покупки.");
-        return;
-      }
+  if (invalidItem) {
+
+    showToast(
+      "Проверьте позиции покупки.",
+      "error"
+    );
+
+    return;
+  }
 
 
-      items.push({
-        name,
-        amount: itemAmount,
-        category_id: categoryId
-      });
-    }
+  if (items.length) {
+
+    const itemsTotal =
+      roundMoney(
+        sum(
+          items.map(
+            item =>
+              Number(item.amount)
+          )
+        )
+      );
 
 
-    if (items.length > 0) {
+    if (
+      Math.abs(
+        itemsTotal - amount
+      ) >= 0.01
+    ) {
 
-      const itemsTotal =
-        items.reduce(
-          (total, item) =>
-            total + item.amount,
-          0
-        );
+      showToast(
+        `Сумма позиций ${money(
+          itemsTotal
+        )} не совпадает с суммой операции ${money(
+          amount
+        )}.`,
+        "error"
+      );
 
-
-      if (
-        Math.round(itemsTotal * 100) !==
-        Math.round(amount * 100)
-      ) {
-        toast(
-          "Сумма позиций должна совпадать с общей суммой."
-        );
-
-        return;
-      }
+      return;
     }
   }
 
 
-  const transactionPayload = {
-    type,
-    amount,
-    date,
-    merchant:
-      type === "expense"
-        ? merchant
-        : null,
-    income_source:
-      type === "income"
-        ? incomeSource
-        : null,
-    comment
-  };
+  /*
+    Если позиций нет, для расхода
+    используем выбранную категорию из
+    общего поля? В текущем HTML такого
+    select нет, поэтому оставляем category_id
+    прежней транзакции при редактировании.
+  */
+
+  let categoryId =
+    state.editingTransaction
+      ?.category_id || null;
 
 
-  let transactionId =
-    id;
+  /*
+    Если редактируется детализированная
+    покупка, category_id транзакции не
+    должен принудительно заменяться.
+  */
+
+  const merchantName =
+    type === "expense"
+      ? (
+          $("#transaction-merchant")
+            ?.value.trim() || null
+        )
+      : null;
 
 
-  if (id) {
-
-    const {
-      error
-    } =
-      await supabaseClient
-        .from("transactions")
-        .update(transactionPayload)
-        .eq("id", id);
+  const incomeSource =
+    type === "income"
+      ? (
+          $("#transaction-income-source")
+            ?.value.trim() || null
+        )
+      : null;
 
 
-    if (error) {
-      handleDbError(error);
-      return;
+  const comment =
+    $("#transaction-comment")
+      ?.value.trim() || null;
+
+
+  setSaving(true);
+
+
+  try {
+
+    /*
+      Автоматически находим/создаём магазин.
+      В transaction.merchant хранится строка,
+      поэтому это остаётся совместимым
+      с текущей схемой.
+    */
+
+    let merchant =
+      merchantName;
+
+
+    if (
+      type === "expense" &&
+      merchantName
+    ) {
+      await ensureMerchant(
+        merchantName
+      );
     }
 
 
-    const {
-      error: itemsDeleteError
-    } =
+    const payload = {
+      type,
+      amount,
+      date,
+      merchant,
+      income_source: incomeSource,
+      comment,
+      category_id: categoryId
+    };
+
+
+    let transactionId =
+      state.editingTransaction?.id ||
+      null;
+
+
+    if (transactionId) {
+
+      const {
+        error
+      } = await supabaseClient
+        .from("transactions")
+        .update(payload)
+        .eq(
+          "id",
+          transactionId
+        );
+
+      if (error) {
+        throw error;
+      }
+
+    } else {
+
+      const {
+        data,
+        error
+      } = await supabaseClient
+        .from("transactions")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      transactionId =
+        data.id;
+    }
+
+
+    /*
+      Полностью пересобираем items.
+      Для пользовательского финансового
+      трекера это надёжнее сложной diff-логики.
+    */
+
+    if (type === "expense") {
+
       await supabaseClient
         .from("transaction_items")
         .delete()
         .eq(
           "transaction_id",
-          id
+          transactionId
         );
 
 
-    if (itemsDeleteError) {
-      handleDbError(itemsDeleteError);
-      return;
-    }
+      if (items.length) {
 
-  } else {
-
-    const {
-      data,
-      error
-    } =
-      await supabaseClient
-        .from("transactions")
-        .insert(transactionPayload)
-        .select("id")
-        .single();
-
-
-    if (error) {
-      handleDbError(error);
-      return;
-    }
+        const rows =
+          items.map(
+            item => ({
+              transaction_id:
+                transactionId,
+              name: item.name,
+              amount:
+                roundMoney(
+                  item.amount
+                ),
+              category_id:
+                item.category_id
+            })
+          );
 
 
-    transactionId =
-      data.id;
-  }
+        const {
+          error
+        } = await supabaseClient
+          .from("transaction_items")
+          .insert(rows);
 
 
-  if (items.length > 0) {
-
-    const payload =
-      items.map(item => ({
-        transaction_id:
-          transactionId,
-
-        name:
-          item.name,
-
-        amount:
-          item.amount,
-
-        category_id:
-          item.category_id
-      }));
+        if (error) {
+          throw error;
+        }
 
 
-    const {
-      error
-    } =
+        /*
+          У детализированной покупки
+          категория самой транзакции не
+          нужна: категории живут в items.
+        */
+
+        await supabaseClient
+          .from("transactions")
+          .update({
+            category_id: null
+          })
+          .eq(
+            "id",
+            transactionId
+          );
+      }
+    } else {
+
+      /*
+        У дохода items быть не должно.
+      */
+
       await supabaseClient
         .from("transaction_items")
-        .insert(payload);
-
-
-    if (error) {
-      handleDbError(error);
-      return;
+        .delete()
+        .eq(
+          "transaction_id",
+          transactionId
+        );
     }
+
+
+    closeModal(
+      "transaction-modal"
+    );
+
+
+    state.editingTransaction =
+      null;
+
+
+    await reloadCurrentMonth();
+
+
+    showToast(
+      "Операция сохранена."
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+
+  } finally {
+    setSaving(false);
   }
-
-
-  if (merchant) {
-    await rememberMerchant(merchant);
-  }
-
-
-  closeModal(
-    "transaction-modal"
-  );
-
-
-  toast(
-    id
-      ? "Операция обновлена."
-      : "Операция сохранена."
-  );
-
-
-  await loadReferenceData();
-
-  await loadMonthData();
-
-  renderEverything();
 }
 
 
 /* =========================================================
-   DELETE TRANSACTION
+   EDIT / DELETE
 ========================================================= */
+
+async function editTransaction(id) {
+
+  const transaction =
+    state.transactions.find(
+      item =>
+        item.id === id
+    );
+
+
+  if (!transaction) {
+    showToast(
+      "Операция не найдена.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  openTransactionModal(
+    transaction.type,
+    transaction
+  );
+}
+
 
 async function deleteTransaction(id) {
 
-  if (!confirm("Удалить эту операцию?")) {
+  const transaction =
+    state.transactions.find(
+      item =>
+        item.id === id
+    );
+
+
+  if (!transaction) {
     return;
   }
 
 
-  const { error } = await supabaseClient
-    .from("transactions")
-    .delete()
-    .eq("id", id);
+  const confirmed =
+    window.confirm(
+      `Удалить операцию ${money(
+        Number(transaction.amount)
+      )}?`
+    );
 
 
-  if (error) {
-    handleDbError(error);
+  if (!confirmed) {
     return;
   }
 
 
-  toast("Операция удалена.");
+  try {
 
-  await loadMonthData();
+    setLoading(true);
 
-  renderEverything();
+
+    /*
+      Сначала удаляем позиции.
+      Это не зависит от того, есть ли
+      CASCADE в текущей схеме.
+    */
+
+    const {
+      error: itemsError
+    } = await supabaseClient
+      .from("transaction_items")
+      .delete()
+      .eq(
+        "transaction_id",
+        id
+      );
+
+
+    if (itemsError) {
+      throw itemsError;
+    }
+
+
+    const {
+      error
+    } = await supabaseClient
+      .from("transactions")
+      .delete()
+      .eq(
+        "id",
+        id
+      );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    await reloadCurrentMonth();
+
+
+    showToast(
+      "Операция удалена."
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+
+  } finally {
+    setLoading(false);
+  }
 }
 
 
@@ -1465,139 +2537,240 @@ async function deleteTransaction(id) {
    CATEGORIES
 ========================================================= */
 
-async function addCategory(event) {
+function expenseCategories() {
 
+  return state.categories.filter(
+    category =>
+      category.type === "expense"
+  );
+}
+
+
+function incomeCategories() {
+
+  return state.categories.filter(
+    category =>
+      category.type === "income"
+  );
+}
+
+
+function populateCategoryFilters() {
+
+  const select =
+    $("#transaction-category-filter");
+
+  if (!select) {
+    return;
+  }
+
+
+  const current =
+    select.value;
+
+
+  select.innerHTML = `
+    <option value="all">
+      Все категории
+    </option>
+  `;
+
+
+  state.categories
+    .forEach(
+      category => {
+
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          category.id;
+
+        option.textContent =
+          category.name;
+
+        select.appendChild(
+          option
+        );
+      }
+    );
+
+
+  if (
+    [...select.options]
+      .some(
+        option =>
+          option.value === current
+      )
+  ) {
+    select.value = current;
+  }
+}
+
+
+function populateBudgetCategories() {
+
+  const select =
+    $("#budget-category");
+
+  if (!select) {
+    return;
+  }
+
+
+  select.innerHTML = `
+    <option value="">
+      Выберите категорию
+    </option>
+  `;
+
+
+  expenseCategories()
+    .forEach(
+      category => {
+
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          category.id;
+
+        option.textContent =
+          category.name;
+
+        select.appendChild(
+          option
+        );
+      }
+    );
+}
+
+
+async function addCategory(event) {
   event.preventDefault();
 
   const name =
-    $("#new-category-name").value.trim();
+    $("#new-category-name")
+      ?.value.trim();
 
   const type =
-    $("#new-category-type").value;
+    $("#new-category-type")
+      ?.value || "expense";
+
 
   if (!name) {
     return;
   }
 
 
-  const { error } = await supabaseClient
-    .from("categories")
-    .insert({
-      name,
-      type
-    });
+  try {
+
+    const {
+      error
+    } = await supabaseClient
+      .from("categories")
+      .insert({
+        name,
+        type
+      });
 
 
-  if (error) {
-    handleDbError(error);
-    return;
+    if (error) {
+      throw error;
+    }
+
+
+    $("#new-category-name")
+      .value = "";
+
+
+    await loadReferenceData();
+
+    renderEverything();
+
+
+    showToast(
+      "Категория добавлена."
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
   }
-
-
-  $("#new-category-name").value = "";
-
-  await loadReferenceData();
-
-  renderSettings();
-
-  populateCategoryFilters();
-
-  toast("Категория добавлена.");
 }
 
 
 async function deleteCategory(id) {
 
-  if (
-    !confirm(
-      "Удалить категорию? Существующие операции не будут удалены."
-    )
-  ) {
+  const category =
+    state.categories.find(
+      item =>
+        item.id === id
+    );
+
+
+  if (!category) {
     return;
   }
 
 
-  const { error } = await supabaseClient
-    .from("categories")
-    .delete()
-    .eq("id", id);
+  const confirmed =
+    window.confirm(
+      `Удалить категорию «${category.name}»?`
+    );
 
 
-  if (error) {
-    handleDbError(error);
+  if (!confirmed) {
     return;
   }
 
 
-  await loadReferenceData();
+  try {
 
-  renderSettings();
-
-  populateCategoryFilters();
-
-  toast("Категория удалена.");
-}
-
-
-function renderSettings() {
-
-  const categories = $("#categories-settings");
-
-  categories.innerHTML =
-    state.categories
-      .map(category => `
-        <div class="setting-row">
-          <div>
-            <strong>${escapeHtml(category.name)}</strong>
-            <span>${category.type === "expense" ? "Расход" : "Доход"}</span>
-          </div>
-
-          <button
-            class="icon-button"
-            data-delete-category="${category.id}"
-          >×</button>
-        </div>
-      `)
-      .join("") ||
-    emptyState("Категорий пока нет.");
+    const {
+      error
+    } = await supabaseClient
+      .from("categories")
+      .delete()
+      .eq(
+        "id",
+        id
+      );
 
 
-  categories
-    .querySelectorAll("[data-delete-category]")
-    .forEach(button => {
-      button.addEventListener("click", () => {
-        deleteCategory(button.dataset.deleteCategory);
-      });
-    });
+    if (error) {
+      throw error;
+    }
 
 
-  const merchants = $("#merchants-settings");
+    await loadReferenceData();
+    await loadMonthData();
 
-  merchants.innerHTML =
-    state.merchants
-      .map(merchant => `
-        <div class="setting-row">
-          <div>
-            <strong>${escapeHtml(merchant.name)}</strong>
-          </div>
-
-          <button
-            class="icon-button"
-            data-delete-merchant="${merchant.id}"
-          >×</button>
-        </div>
-      `)
-      .join("") ||
-    emptyState("Магазинов пока нет.");
+    renderEverything();
 
 
-  merchants
-    .querySelectorAll("[data-delete-merchant]")
-    .forEach(button => {
-      button.addEventListener("click", () => {
-        deleteMerchant(button.dataset.deleteMerchant);
-      });
-    });
+    showToast(
+      "Категория удалена."
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+  }
 }
 
 
@@ -1605,101 +2778,340 @@ function renderSettings() {
    MERCHANTS
 ========================================================= */
 
-async function addMerchant(event) {
+function populateMerchantOptions() {
 
+  const datalist =
+    $("#merchant-options");
+
+  if (!datalist) {
+    return;
+  }
+
+
+  datalist.innerHTML =
+    state.merchants
+      .map(
+        merchant => `
+          <option
+            value="${escapeHtmlAttribute(
+              merchant.name
+            )}"
+          ></option>
+        `
+      )
+      .join("");
+}
+
+
+async function ensureMerchant(name) {
+
+  const normalized =
+    name.trim();
+
+
+  if (!normalized) {
+    return null;
+  }
+
+
+  const existing =
+    state.merchants.find(
+      merchant =>
+        merchant.name
+          .trim()
+          .toLowerCase() ===
+        normalized.toLowerCase()
+    );
+
+
+  if (existing) {
+    return existing;
+  }
+
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("merchants")
+    .insert({
+      name: normalized
+    })
+    .select("*")
+    .single();
+
+
+  if (error) {
+
+    /*
+      Не ломаем сохранение транзакции,
+      если магазин уже появился параллельно.
+    */
+
+    if (
+      error.code === "23505"
+    ) {
+
+      const {
+        data: duplicate
+      } = await supabaseClient
+        .from("merchants")
+        .select("*")
+        .ilike(
+          "name",
+          normalized
+        )
+        .limit(1)
+        .maybeSingle();
+
+      return duplicate || null;
+    }
+
+    throw error;
+  }
+
+
+  state.merchants.push(data);
+
+  state.merchants.sort(
+    (a, b) =>
+      a.name.localeCompare(
+        b.name,
+        "ru"
+      )
+  );
+
+  return data;
+}
+
+
+async function addMerchant(event) {
   event.preventDefault();
 
   const name =
-    $("#new-merchant-name").value.trim();
+    $("#new-merchant-name")
+      ?.value.trim();
+
 
   if (!name) {
     return;
   }
 
 
-  const { error } = await supabaseClient
-    .from("merchants")
-    .insert({
-      name
-    });
+  try {
+
+    await ensureMerchant(name);
+
+    $("#new-merchant-name")
+      .value = "";
 
 
-  if (error) {
-    handleDbError(error);
-    return;
-  }
+    await loadReferenceData();
+
+    renderEverything();
 
 
-  $("#new-merchant-name").value = "";
+    showToast(
+      "Магазин добавлен."
+    );
 
-  await loadReferenceData();
+  } catch (error) {
 
-  renderSettings();
-
-  populateMerchantOptions();
-
-  toast("Магазин добавлен.");
-}
-
-
-async function rememberMerchant(name) {
-
-  const normalized = name.trim();
-
-  if (!normalized) {
-    return;
-  }
-
-
-  const exists = state.merchants.some(
-    merchant =>
-      merchant.name.toLowerCase() === normalized.toLowerCase()
-  );
-
-  if (exists) {
-    return;
-  }
-
-
-  const { error } = await supabaseClient
-    .from("merchants")
-    .insert({
-      name: normalized
-    });
-
-
-  if (error) {
     console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
   }
 }
 
 
 async function deleteMerchant(id) {
 
-  if (!confirm("Удалить магазин из справочника?")) {
+  const merchant =
+    state.merchants.find(
+      item =>
+        item.id === id
+    );
+
+
+  if (!merchant) {
     return;
   }
 
 
-  const { error } = await supabaseClient
-    .from("merchants")
-    .delete()
-    .eq("id", id);
+  const confirmed =
+    window.confirm(
+      `Удалить магазин «${merchant.name}»?`
+    );
 
 
-  if (error) {
-    handleDbError(error);
+  if (!confirmed) {
     return;
   }
 
 
-  await loadReferenceData();
+  try {
 
-  renderSettings();
+    const {
+      error
+    } = await supabaseClient
+      .from("merchants")
+      .delete()
+      .eq(
+        "id",
+        id
+      );
 
-  populateMerchantOptions();
 
-  toast("Магазин удалён.");
+    if (error) {
+      throw error;
+    }
+
+
+    await loadReferenceData();
+
+    renderEverything();
+
+
+    showToast(
+      "Магазин удалён."
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+  }
+}
+
+
+/* =========================================================
+   SETTINGS
+========================================================= */
+
+function renderSettings() {
+
+  renderCategoriesSettings();
+
+  renderMerchantsSettings();
+}
+
+
+function renderCategoriesSettings() {
+
+  const container =
+    $("#categories-settings");
+
+  if (!container) {
+    return;
+  }
+
+
+  if (!state.categories.length) {
+
+    container.innerHTML =
+      emptyState(
+        "Категорий пока нет."
+      );
+
+    return;
+  }
+
+
+  container.innerHTML =
+    state.categories
+      .map(
+        category => `
+          <div class="settings-row">
+
+            <div>
+              <strong>
+                ${escapeHtml(
+                  category.name
+                )}
+              </strong>
+
+              <small>
+                ${
+                  category.type === "income"
+                    ? "Доход"
+                    : "Расход"
+                }
+              </small>
+            </div>
+
+            <button
+              class="icon-button"
+              type="button"
+              onclick="deleteCategory('${escapeJs(
+                category.id
+              )}')"
+            >
+              ×
+            </button>
+
+          </div>
+        `
+      )
+      .join("");
+}
+
+
+function renderMerchantsSettings() {
+
+  const container =
+    $("#merchants-settings");
+
+  if (!container) {
+    return;
+  }
+
+
+  if (!state.merchants.length) {
+
+    container.innerHTML =
+      emptyState(
+        "Магазинов пока нет."
+      );
+
+    return;
+  }
+
+
+  container.innerHTML =
+    state.merchants
+      .map(
+        merchant => `
+          <div class="settings-row">
+
+            <div>
+              <strong>
+                ${escapeHtml(
+                  merchant.name
+                )}
+              </strong>
+            </div>
+
+            <button
+              class="icon-button"
+              type="button"
+              onclick="deleteMerchant('${escapeJs(
+                merchant.id
+              )}')"
+            >
+              ×
+            </button>
+
+          </div>
+        `
+      )
+      .join("");
 }
 
 
@@ -1709,193 +3121,423 @@ async function deleteMerchant(id) {
 
 function openBudgetModal() {
 
-  const expenseCategories =
-    state.categories.filter(
-      category => category.type === "expense"
-    );
+  populateBudgetCategories();
 
+  setValue(
+    "#budget-amount",
+    ""
+  );
 
-  $("#budget-category").innerHTML =
-    expenseCategories
-      .map(category => `
-        <option value="${category.id}">
-          ${escapeHtml(category.name)}
-        </option>
-      `)
-      .join("");
-
-
-  $("#budget-amount").value = "";
-
-  openModal("budget-modal");
+  openModal(
+    "budget-modal"
+  );
 }
 
 
 async function saveBudget(event) {
-
   event.preventDefault();
 
   const categoryId =
-    $("#budget-category").value;
+    $("#budget-category")
+      ?.value;
+
 
   const amount =
-    Number($("#budget-amount").value);
+    roundMoney(
+      Number(
+        $("#budget-amount")
+          ?.value || 0
+      )
+    );
 
 
-  if (!categoryId || !amount || amount <= 0) {
+  if (!categoryId) {
+
+    showToast(
+      "Выберите категорию.",
+      "error"
+    );
+
     return;
   }
 
 
-  const { error } = await supabaseClient
-    .from("budgets")
-    .upsert({
-      month: state.selectedMonth,
-      category_id: categoryId,
-      amount
-    }, {
-      onConflict: "user_id,month,category_id"
-    });
+  if (
+    !amount ||
+    amount <= 0
+  ) {
 
+    showToast(
+      "Введите сумму лимита.",
+      "error"
+    );
 
-  if (error) {
-    handleDbError(error);
     return;
   }
 
 
-  closeModal("budget-modal");
+  try {
 
-  await loadReferenceData();
+    /*
+      Сначала пытаемся найти существующий
+      лимит категории за месяц.
+    */
 
-  await loadMonthData();
+    const {
+      data: existing,
+      error: findError
+    } = await supabaseClient
+      .from("budgets")
+      .select("id")
+      .eq(
+        "month",
+        state.selectedMonth
+      )
+      .eq(
+        "category_id",
+        categoryId
+      )
+      .maybeSingle();
 
-  renderBudgets();
 
-  toast("Лимит сохранён.");
+    if (findError) {
+      throw findError;
+    }
+
+
+    let error;
+
+
+    if (existing?.id) {
+
+      ({
+        error
+      } = await supabaseClient
+        .from("budgets")
+        .update({
+          amount
+        })
+        .eq(
+          "id",
+          existing.id
+        ));
+
+    } else {
+
+      ({
+        error
+      } = await supabaseClient
+        .from("budgets")
+        .insert({
+          month:
+            state.selectedMonth,
+          category_id:
+            categoryId,
+          amount
+        }));
+    }
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    closeModal(
+      "budget-modal"
+    );
+
+
+    await loadMonthData();
+
+    renderBudgets();
+
+
+    showToast(
+      "Лимит сохранён."
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+  }
 }
 
 
 function renderBudgets() {
 
-  const container = $("#budgets-list");
+  const container =
+    $("#budgets-list");
+
+  if (!container) {
+    return;
+  }
+
 
   if (!state.budgets.length) {
 
-    container.innerHTML = `
-      <div class="panel">
-        ${emptyState("Лимитов на этот месяц пока нет.")}
-      </div>
-    `;
+    container.innerHTML =
+      emptyState(
+        "На этот месяц лимитов пока нет."
+      );
 
     return;
   }
 
 
-  const expensesByCategory =
-    getExpenseAmountsByCategory();
-
-
   container.innerHTML =
     state.budgets
-      .map(budget => {
+      .map(
+        budget => {
 
-        const category =
-          state.categories.find(
-            x => x.id === budget.category_id
-          );
+          const category =
+            budget.category ||
+            state.categories.find(
+              item =>
+                item.id ===
+                budget.category_id
+            );
 
-        const spent =
-          expensesByCategory.get(budget.category_id) || 0;
 
-        const limit =
-          Number(budget.amount);
+          const spent =
+            getCategorySpent(
+              budget.category_id
+            );
 
-        const percent =
-          limit
-            ? Math.round(spent / limit * 100)
-            : 0;
 
-        const width =
-          Math.min(percent, 100);
+          const limit =
+            Number(
+              budget.amount
+            ) || 0;
 
-        return `
-          <article class="budget-card">
 
-            <div class="budget-header">
-              <div>
-                <strong>
-                  ${escapeHtml(category?.name || "Категория")}
-                </strong>
+          const percent =
+            limit > 0
+              ? Math.round(
+                  spent / limit * 100
+                )
+              : 0;
 
-                <span>
-                  ${money(limit)} лимит
-                </span>
+
+          const width =
+            Math.min(
+              percent,
+              100
+            );
+
+
+          const status =
+            percent >= 100
+              ? "danger"
+              : percent >= 80
+                ? "warning"
+                : "";
+
+
+          const remaining =
+            limit - spent;
+
+
+          return `
+            <article
+              class="budget-card ${status}"
+            >
+
+              <div class="budget-heading">
+
+                <div>
+                  <strong>
+                    ${escapeHtml(
+                      category?.name ||
+                      "Категория"
+                    )}
+                  </strong>
+
+                  <small>
+                    ${money(spent)}
+                    из
+                    ${money(limit)}
+                  </small>
+                </div>
+
+                <button
+                  class="icon-button"
+                  type="button"
+                  onclick="deleteBudget('${escapeJs(
+                    budget.id
+                  )}')"
+                >
+                  ×
+                </button>
+
               </div>
 
-              <span class="budget-percent">
-                ${percent}%
-              </span>
-            </div>
+              <div class="progress">
+                <div
+                  class="progress-bar"
+                  style="width:${width}%"
+                ></div>
+              </div>
 
-            <div class="progress">
-              <div
-                class="progress-bar"
-                style="width:${width}%"
-              ></div>
-            </div>
+              <div class="budget-footer">
 
-            <div class="budget-numbers">
-              <span>Потрачено ${money(spent)}</span>
-              <span>
-                ${spent > limit
-                  ? `Превышение ${money(spent - limit)}`
-                  : `Осталось ${money(limit - spent)}`}
-              </span>
-            </div>
+                <span>
+                  ${
+                    remaining >= 0
+                      ? `Осталось ${money(
+                          remaining
+                        )}`
+                      : `Превышение ${money(
+                          Math.abs(
+                            remaining
+                          )
+                        )}`
+                  }
+                </span>
 
-          </article>
-        `;
-      })
+                <strong>
+                  ${percent}%
+                </strong>
+
+              </div>
+
+            </article>
+          `;
+        }
+      )
       .join("");
 }
 
 
-function getExpenseAmountsByCategory() {
+async function deleteBudget(id) {
 
-  const map = new Map();
-
-  for (const transaction of state.transactions) {
-
-    if (transaction.type !== "expense") {
-      continue;
-    }
+  const confirmed =
+    window.confirm(
+      "Удалить этот лимит?"
+    );
 
 
-    const items =
-      transaction.transaction_items || [];
-
-
-    if (!items.length) {
-      continue;
-    }
-
-
-    for (const item of items) {
-
-      if (!item.category_id) {
-        continue;
-      }
-
-      map.set(
-        item.category_id,
-        (map.get(item.category_id) || 0) +
-        Number(item.amount)
-      );
-    }
+  if (!confirmed) {
+    return;
   }
 
-  return map;
+
+  try {
+
+    const {
+      error
+    } = await supabaseClient
+      .from("budgets")
+      .delete()
+      .eq(
+        "id",
+        id
+      );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    await loadMonthData();
+
+    renderBudgets();
+
+
+    showToast(
+      "Лимит удалён."
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+  }
+}
+
+
+function getCategorySpent(
+  categoryId
+) {
+
+  return state.transactions
+    .filter(
+      transaction =>
+        transaction.type === "expense"
+    )
+    .reduce(
+      (total, transaction) => {
+
+        /*
+          Если транзакция имеет items,
+          считаем позиции по категории.
+        */
+
+        const items =
+          transaction.transaction_items ||
+          [];
+
+
+        if (items.length) {
+
+          const itemTotal =
+            items
+              .filter(
+                item =>
+                  item.category_id ===
+                  categoryId
+              )
+              .reduce(
+                (
+                  sumValue,
+                  item
+                ) =>
+                  sumValue +
+                  Number(
+                    item.amount
+                  ),
+                0
+              );
+
+          return (
+            total +
+            itemTotal
+          );
+        }
+
+
+        /*
+          Обычный расход:
+          категория лежит в самой транзакции.
+        */
+
+        if (
+          transaction.category_id ===
+          categoryId
+        ) {
+          return (
+            total +
+            Number(
+              transaction.amount
+            )
+          );
+        }
+
+
+        return total;
+      },
+      0
+    );
 }
 
 
@@ -1905,54 +3547,159 @@ function getExpenseAmountsByCategory() {
 
 async function renderAnalytics() {
 
-  const transactions =
-    await getAnalyticsTransactions();
+  const period =
+    state.analyticsPeriod;
 
 
-  renderAnalyticsCategories(transactions);
+  try {
 
-  renderAnalyticsMerchants(transactions);
+    const transactions =
+      await getAnalyticsTransactions(
+        period
+      );
 
-  renderAnalyticsItems(transactions);
+
+    state.analyticsTransactions =
+      transactions;
+
+
+    renderAnalyticsCategories(
+      transactions
+    );
+
+
+    renderAnalyticsMerchants(
+      transactions
+    );
+
+
+    renderAnalyticsItems(
+      transactions
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+  }
 }
 
 
-async function getAnalyticsTransactions() {
+async function getAnalyticsTransactions(
+  period
+) {
 
-  const { start, end } =
-    getAnalyticsDateRange();
+  /*
+    Для аналитики нельзя использовать
+    только выбранный месяц.
+
+    Берём полноценный диапазон.
+  */
+
+  const end =
+    getMonthRange(
+      state.selectedMonth
+    ).end;
 
 
-  const { data, error } =
-    await supabaseClient
-      .from("transactions")
-      .select(`
-        *,
-        transaction_items (
-          id,
-          name,
-          amount,
-          category_id,
-          category:categories (
-            id,
-            name,
-            type
-          )
-        ),
+  let start;
+
+
+  if (period === "year") {
+
+    const date =
+      new Date(
+        `${state.selectedMonth}-01T00:00:00`
+      );
+
+    date.setMonth(
+      date.getMonth() - 11
+    );
+
+    start =
+      dateToString(
+        new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          1
+        )
+      );
+
+  } else if (period === "3months") {
+
+    const date =
+      new Date(
+        `${state.selectedMonth}-01T00:00:00`
+      );
+
+    date.setMonth(
+      date.getMonth() - 2
+    );
+
+    start =
+      dateToString(
+        new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          1
+        )
+      );
+
+  } else {
+
+    start =
+      getMonthRange(
+        state.selectedMonth
+      ).start;
+  }
+
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("transactions")
+    .select(`
+      *,
+      category:categories (
+        id,
+        name,
+        type
+      ),
+      transaction_items (
+        id,
+        name,
+        amount,
+        category_id,
         category:categories (
           id,
           name,
           type
         )
-      `)
-      .gte("date", start)
-      .lte("date", end)
-      .order("date", { ascending: false });
+      )
+    `)
+    .gte(
+      "date",
+      start
+    )
+    .lte(
+      "date",
+      end
+    )
+    .order(
+      "date",
+      {
+        ascending: true
+      }
+    );
 
 
   if (error) {
-    handleDbError(error);
-    return [];
+    throw error;
   }
 
 
@@ -1960,260 +3707,326 @@ async function getAnalyticsTransactions() {
 }
 
 
-function getAnalyticsDateRange() {
-
-  const [year, month] =
-    state.selectedMonth.split("-").map(Number);
-
-
-  if (state.analyticsPeriod === "month") {
-
-    return {
-      start: `${year}-${pad(month)}-01`,
-      end: formatDate(
-        new Date(year, month, 0)
-      )
-    };
-  }
-
-
-  if (state.analyticsPeriod === "3months") {
-
-    const startDate =
-      new Date(year, month - 3, 1);
-
-    const endDate =
-      new Date(year, month, 0);
-
-
-    return {
-      start: formatDate(startDate),
-      end: formatDate(endDate)
-    };
-  }
-
-
-  return {
-    start: `${year}-01-01`,
-    end: `${year}-12-31`
-  };
-}
-
-
-function renderAnalyticsCategories(transactions) {
+function renderAnalyticsCategories(
+  transactions
+) {
 
   const container =
     $("#analytics-categories");
 
-  const map = new Map();
-
-
-  for (const transaction of transactions) {
-
-    if (transaction.type !== "expense") {
-      continue;
-    }
-
-
-    const items =
-      transaction.transaction_items || [];
-
-
-    if (!items.length) {
-
-      const name =
-        transaction.category?.name ||
-        "Без категории";
-
-      map.set(
-        name,
-        (map.get(name) || 0) +
-        Number(transaction.amount)
-      );
-
-    } else {
-
-      for (const item of items) {
-
-        const name =
-          item.category?.name ||
-          "Без категории";
-
-        map.set(
-          name,
-          (map.get(name) || 0) +
-          Number(item.amount)
-        );
-      }
-    }
+  if (!container) {
+    return;
   }
 
 
-  const entries =
-    [...map.entries()]
-      .map(([name, amount]) => ({
-        name,
-        amount
-      }))
-      .sort((a, b) => b.amount - a.amount);
-
-
-  const total =
-    entries.reduce(
-      (sum, item) => sum + item.amount,
-      0
+  const expenses =
+    transactions.filter(
+      transaction =>
+        transaction.type === "expense"
     );
 
 
-  $("#analytics-category-caption").textContent =
-    `Всего: ${money(total)}`;
+  const groups =
+    new Map();
 
 
-  if (!entries.length) {
+  expenses.forEach(
+    transaction => {
+
+      const items =
+        transaction.transaction_items ||
+        [];
+
+
+      if (items.length) {
+
+        items.forEach(
+          item => {
+
+            const name =
+              item.category?.name ||
+              findCategoryName(
+                item.category_id
+              ) ||
+              "Без категории";
+
+
+            addToMap(
+              groups,
+              name,
+              Number(
+                item.amount
+              )
+            );
+          }
+        );
+
+      } else {
+
+        const name =
+          transaction.category?.name ||
+          findCategoryName(
+            transaction.category_id
+          ) ||
+          "Без категории";
+
+
+        addToMap(
+          groups,
+          name,
+          Number(
+            transaction.amount
+          )
+        );
+      }
+    }
+  );
+
+
+  const total =
+    [...groups.values()]
+      .reduce(
+        (sumValue, value) =>
+          sumValue + value,
+        0
+      );
+
+
+  const rows =
+    [...groups.entries()]
+      .sort(
+        (a, b) =>
+          b[1] - a[1]
+      );
+
+
+  setText(
+    "#analytics-category-caption",
+    `${money(total)} расходов`
+  );
+
+
+  if (!rows.length) {
+
     container.innerHTML =
-      emptyState("Нет расходов за выбранный период.");
+      emptyState(
+        "Нет расходов за период."
+      );
+
     return;
   }
 
 
   container.innerHTML =
-    entries
-      .map(item => {
+    rows
+      .map(
+        ([name, amount]) => {
 
-        const percent =
-          total
-            ? Math.round(item.amount / total * 100)
-            : 0;
+          const percent =
+            total > 0
+              ? Math.round(
+                  amount / total * 100
+                )
+              : 0;
 
-        return `
-          <div class="analytics-item">
-            <div>
-              <strong>${escapeHtml(item.name)}</strong>
 
-              <div class="progress" style="margin-top:8px">
-                <div
-                  class="progress-bar"
-                  style="width:${percent}%"
-                ></div>
+          return `
+            <div class="analytics-item">
+
+              <div>
+                <strong>
+                  ${escapeHtml(name)}
+                </strong>
+
+                <span>
+                  ${percent}%
+                </span>
               </div>
-            </div>
 
-            <span>
-              ${money(item.amount)} · ${percent}%
-            </span>
-          </div>
-        `;
-      })
+              <strong>
+                ${money(amount)}
+              </strong>
+
+            </div>
+          `;
+        }
+      )
       .join("");
 }
 
 
-function renderAnalyticsMerchants(transactions) {
+function renderAnalyticsMerchants(
+  transactions
+) {
 
   const container =
     $("#analytics-merchants");
 
-  const map = new Map();
-
-
-  for (const transaction of transactions) {
-
-    if (
-      transaction.type !== "expense" ||
-      !transaction.merchant
-    ) {
-      continue;
-    }
-
-
-    map.set(
-      transaction.merchant,
-      (map.get(transaction.merchant) || 0) +
-      Number(transaction.amount)
-    );
+  if (!container) {
+    return;
   }
 
 
-  const entries =
-    [...map.entries()]
-      .map(([name, amount]) => ({
-        name,
-        amount
-      }))
-      .sort((a, b) => b.amount - a.amount);
+  const groups =
+    new Map();
 
 
-  if (!entries.length) {
+  transactions
+    .filter(
+      transaction =>
+        transaction.type === "expense"
+    )
+    .forEach(
+      transaction => {
+
+        const name =
+          transaction.merchant ||
+          "Без магазина";
+
+
+        addToMap(
+          groups,
+          name,
+          Number(
+            transaction.amount
+          )
+        );
+      }
+    );
+
+
+  const rows =
+    [...groups.entries()]
+      .sort(
+        (a, b) =>
+          b[1] - a[1]
+      )
+      .slice(0, 15);
+
+
+  if (!rows.length) {
+
     container.innerHTML =
-      emptyState("Нет данных о местах покупок.");
+      emptyState(
+        "Нет данных о магазинах."
+      );
+
     return;
   }
 
 
   container.innerHTML =
-    entries
-      .slice(0, 15)
-      .map(item => `
-        <div class="analytics-item">
-          <strong>${escapeHtml(item.name)}</strong>
-          <span>${money(item.amount)}</span>
-        </div>
-      `)
+    rows
+      .map(
+        ([name, amount]) => `
+          <div class="analytics-item">
+
+            <div>
+              <strong>
+                ${escapeHtml(name)}
+              </strong>
+            </div>
+
+            <strong>
+              ${money(amount)}
+            </strong>
+
+          </div>
+        `
+      )
       .join("");
 }
 
 
-function renderAnalyticsItems(transactions) {
+function renderAnalyticsItems(
+  transactions
+) {
 
   const container =
     $("#analytics-items");
 
-  const map = new Map();
-
-
-  for (const transaction of transactions) {
-
-    if (transaction.type !== "expense") {
-      continue;
-    }
-
-
-    for (const item of transaction.transaction_items || []) {
-
-      map.set(
-        item.name,
-        (map.get(item.name) || 0) +
-        Number(item.amount)
-      );
-    }
+  if (!container) {
+    return;
   }
 
 
-  const entries =
-    [...map.entries()]
-      .map(([name, amount]) => ({
-        name,
-        amount
-      }))
-      .sort((a, b) => b.amount - a.amount);
+  const groups =
+    new Map();
 
 
-  if (!entries.length) {
+  transactions
+    .filter(
+      transaction =>
+        transaction.type === "expense"
+    )
+    .forEach(
+      transaction => {
+
+        const items =
+          transaction.transaction_items ||
+          [];
+
+
+        items.forEach(
+          item => {
+
+            const name =
+              item.name ||
+              "Без названия";
+
+
+            addToMap(
+              groups,
+              name,
+              Number(
+                item.amount
+              )
+            );
+          }
+        );
+      }
+    );
+
+
+  const rows =
+    [...groups.entries()]
+      .sort(
+        (a, b) =>
+          b[1] - a[1]
+      )
+      .slice(0, 20);
+
+
+  if (!rows.length) {
+
     container.innerHTML =
-      emptyState("Детализированных позиций пока нет.");
+      emptyState(
+        "Разобранных товаров за этот период нет."
+      );
+
     return;
   }
 
 
   container.innerHTML =
-    entries
-      .slice(0, 30)
-      .map(item => `
-        <div class="analytics-item">
-          <strong>${escapeHtml(item.name)}</strong>
-          <span>${money(item.amount)}</span>
-        </div>
-      `)
+    rows
+      .map(
+        ([name, amount]) => `
+          <div class="analytics-item">
+
+            <div>
+              <strong>
+                ${escapeHtml(name)}
+              </strong>
+            </div>
+
+            <strong>
+              ${money(amount)}
+            </strong>
+
+          </div>
+        `
+      )
       .join("");
 }
 
@@ -2224,21 +4037,35 @@ function renderAnalyticsItems(transactions) {
 
 function renderInsights() {
 
-  const container = $("#insights");
+  const container =
+    $("#insights");
 
-  const categories =
-    groupExpensesByCategory();
+  if (!container) {
+    return;
+  }
 
 
-  if (!categories.length) {
+  const expenses =
+    state.transactions.filter(
+      transaction =>
+        transaction.type === "expense"
+    );
+
+
+  if (!expenses.length) {
 
     container.innerHTML = `
       <div class="insight">
-        <strong>Пока нечего анализировать</strong>
+
+        <strong>
+          Пока нечего анализировать
+        </strong>
+
         <p>
-          Добавьте несколько расходов, и здесь появятся
-          автоматически найденные изменения.
+          Добавьте несколько расходов,
+          и здесь появятся финансовые наблюдения.
         </p>
+
       </div>
     `;
 
@@ -2246,160 +4073,119 @@ function renderInsights() {
   }
 
 
-  const biggest =
-    categories[0];
+  const total =
+    sum(
+      expenses.map(
+        transaction =>
+          Number(
+            transaction.amount
+          )
+      )
+    );
 
 
-  const expensiveItem =
-    getMostExpensiveItem();
+  const largest =
+    [...expenses]
+      .sort(
+        (a, b) =>
+          Number(b.amount) -
+          Number(a.amount)
+      )[0];
 
 
-  const transactionCount =
-    state.transactions.filter(
-      x => x.type === "expense"
-    ).length;
+  const categories =
+    aggregateCategories(
+      expenses
+    );
+
+
+  const topCategory =
+    [...categories.entries()]
+      .sort(
+        (a, b) =>
+          b[1] - a[1]
+      )[0];
+
+
+  const average =
+    total /
+    Math.max(
+      1,
+      new Set(
+        expenses.map(
+          transaction =>
+            transaction.date
+        )
+      ).size
+    );
 
 
   const insights = [];
 
 
-  insights.push({
-    title: "Самая крупная категория",
-    text:
-      `${biggest.name}: ${money(biggest.amount)} за месяц.`
-  });
-
-
-  if (expensiveItem) {
+  if (topCategory) {
 
     insights.push({
-      title: "Крупнейшая позиция",
+      title:
+        topCategory[0],
       text:
-        `${expensiveItem.name}: ${money(expensiveItem.amount)}.`
+        `${money(
+          topCategory[1]
+        )} — крупнейшая категория расходов за месяц.`
     });
+  }
 
-  } else {
+
+  if (largest) {
 
     insights.push({
-      title: "Детализация",
+      title:
+        `Крупная покупка ${money(
+          Number(
+            largest.amount
+          )
+        )}`,
       text:
-        "Разбирайте чеки на позиции, чтобы видеть конкретные товары."
+        `${largest.merchant || "Без магазина"} · ${formatDate(
+          largest.date
+        )}.`
     });
   }
 
 
   insights.push({
-    title: "Количество расходов",
+    title:
+      "Средний расход в день",
     text:
-      `${transactionCount} операций за выбранный месяц.`
+      `${money(
+        average
+      )} по дням, в которые были расходы.`
   });
 
 
   container.innerHTML =
     insights
-      .map(item => `
-        <div class="insight">
-          <strong>${escapeHtml(item.title)}</strong>
-          <p>${escapeHtml(item.text)}</p>
-        </div>
-      `)
+      .slice(0, 3)
+      .map(
+        insight => `
+          <div class="insight">
+
+            <strong>
+              ${escapeHtml(
+                insight.title
+              )}
+            </strong>
+
+            <p>
+              ${escapeHtml(
+                insight.text
+              )}
+            </p>
+
+          </div>
+        `
+      )
       .join("");
-}
-
-
-function getMostExpensiveItem() {
-
-  let result = null;
-
-
-  for (const transaction of state.transactions) {
-
-    if (transaction.type !== "expense") {
-      continue;
-    }
-
-
-    for (const item of transaction.transaction_items || []) {
-
-      if (
-        !result ||
-        Number(item.amount) > result.amount
-      ) {
-        result = {
-          name: item.name,
-          amount: Number(item.amount)
-        };
-      }
-    }
-  }
-
-
-  return result;
-}
-
-
-/* =========================================================
-   FILTERS / OPTIONS
-========================================================= */
-
-function populateCategoryFilters() {
-
-  const filter =
-    $("#transaction-category-filter");
-
-  const current =
-    filter.value;
-
-
-  filter.innerHTML =
-    `<option value="all">Все категории</option>` +
-    state.categories
-      .filter(x => x.type === "expense")
-      .map(category => `
-        <option value="${category.id}">
-          ${escapeHtml(category.name)}
-        </option>
-      `)
-      .join("");
-
-
-  filter.value =
-    [...filter.options].some(
-      option => option.value === current
-    )
-      ? current
-      : "all";
-}
-
-
-function populateMerchantOptions() {
-
-  $("#merchant-options").innerHTML =
-    state.merchants
-      .map(merchant => `
-        <option value="${escapeAttribute(merchant.name)}">
-      `)
-      .join("");
-}
-
-
-function renderCategoryOptions(type, selected = "") {
-
-  return `
-    <option value="">Без категории</option>
-
-    ${state.categories
-      .filter(category => category.type === type)
-      .map(category => `
-        <option
-          value="${category.id}"
-          ${category.id === selected ? "selected" : ""}
-        >
-          ${escapeHtml(category.name)}
-        </option>
-      `)
-      .join("")}
-  `;
 }
 
 
@@ -2409,77 +4195,107 @@ function renderCategoryOptions(type, selected = "") {
 
 async function exportData() {
 
-  const [
-    transactions,
-    categories,
-    merchants,
-    budgets
-  ] = await Promise.all([
+  try {
 
-    fetchAll("transactions", "*"),
-
-    fetchAll("categories", "*"),
-
-    fetchAll("merchants", "*"),
-
-    fetchAll("budgets", "*")
-  ]);
-
-
-  const items =
-    await fetchAll("transaction_items", "*");
-
-
-  const payload = {
-    exported_at: new Date().toISOString(),
-
-    user_id: state.user.id,
-
-    transactions,
-    transaction_items: items,
-    categories,
-    merchants,
-    budgets
-  };
-
-
-  const blob =
-    new Blob(
-      [JSON.stringify(payload, null, 2)],
-      { type: "application/json" }
+    showToast(
+      "Готовим экспорт..."
     );
 
 
-  const url =
-    URL.createObjectURL(blob);
+    const transactions =
+      await fetchAllTransactions();
 
-  const anchor =
-    document.createElement("a");
 
-  anchor.href = url;
+    const categories =
+      state.categories;
 
-  anchor.download =
-    `money-tracker-${new Date().toISOString().slice(0, 10)}.json`;
 
-  anchor.click();
+    const merchants =
+      state.merchants;
 
-  URL.revokeObjectURL(url);
 
-  toast("Данные экспортированы.");
+    const budgets =
+      await fetchAllBudgets();
+
+
+    const payload = {
+      version: 1,
+      exported_at:
+        new Date().toISOString(),
+
+      user_id:
+        state.user?.id || null,
+
+      categories,
+
+      merchants,
+
+      budgets,
+
+      transactions
+    };
+
+
+    downloadFile(
+      JSON.stringify(
+        payload,
+        null,
+        2
+      ),
+      `fintracker-${new Date()
+        .toISOString()
+        .slice(0, 10)}.json`,
+      "application/json"
+    );
+
+
+    $("#user-menu")
+      ?.classList.add(
+        "hidden"
+      );
+
+
+    showToast(
+      "Экспорт готов."
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    showToast(
+      getErrorMessage(error),
+      "error"
+    );
+  }
 }
 
 
-async function fetchAll(table, columns) {
+async function fetchAllBudgets() {
 
-  const { data, error } =
-    await supabaseClient
-      .from(table)
-      .select(columns);
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("budgets")
+    .select(`
+      *,
+      category:categories (
+        id,
+        name,
+        type
+      )
+    `)
+    .order(
+      "month",
+      {
+        ascending: false
+      }
+    );
 
 
   if (error) {
-    handleDbError(error);
-    return [];
+    throw error;
   }
 
 
@@ -2488,23 +4304,313 @@ async function fetchAll(table, columns) {
 
 
 /* =========================================================
-   MONTH
+   MONTH UI
 ========================================================= */
 
 function setMonthUI() {
 
-  const [year, month] =
-    state.selectedMonth.split("-").map(Number);
+  const title =
+    formatMonthTitle(
+      state.selectedMonth
+    );
 
-  const text =
-    `${MONTH_NAMES[month - 1]} ${year}`;
+
+  setText(
+    "#month-picker-button",
+    title
+  );
 
 
-  $("#month-picker-button").textContent =
-    text;
+  setText(
+    "#dashboard-month-title",
+    title
+  );
 
-  $("#dashboard-month-title").textContent =
-    text;
+
+  const input =
+    $("#month-input");
+
+  if (
+    input &&
+    !input.value
+  ) {
+    input.value =
+      state.selectedMonth;
+  }
+}
+
+
+function getMonthKey(date) {
+
+  const year =
+    date.getFullYear();
+
+
+  const month =
+    String(
+      date.getMonth() + 1
+    ).padStart(
+      2,
+      "0"
+    );
+
+
+  return `${year}-${month}`;
+}
+
+
+function getMonthRange(monthKey) {
+
+  const [
+    year,
+    month
+  ] =
+    monthKey
+      .split("-")
+      .map(Number);
+
+
+  const lastDay =
+    new Date(
+      year,
+      month,
+      0
+    ).getDate();
+
+
+  return {
+    start:
+      `${year}-${pad(month)}-01`,
+
+    end:
+      `${year}-${pad(month)}-${pad(
+        lastDay
+      )}`
+  };
+}
+
+
+function formatMonthTitle(
+  monthKey
+) {
+
+  const [
+    year,
+    month
+  ] =
+    monthKey
+      .split("-")
+      .map(Number);
+
+
+  return `${MONTH_NAMES[
+    month - 1
+  ]} ${year}`;
+}
+
+
+/* =========================================================
+   HELPERS: TRANSACTIONS
+========================================================= */
+
+function transactionMatchesCategory(
+  transaction,
+  categoryId
+) {
+
+  if (
+    transaction.category_id ===
+    categoryId
+  ) {
+    return true;
+  }
+
+
+  return (
+    transaction.transaction_items ||
+    []
+  ).some(
+    item =>
+      item.category_id ===
+      categoryId
+  );
+}
+
+
+function getTransactionCategoryName(
+  transaction
+) {
+
+  if (
+    transaction.transaction_items?.length
+  ) {
+
+    const categories =
+      [
+        ...new Set(
+          transaction.transaction_items
+            .map(
+              item =>
+                item.category?.name ||
+                findCategoryName(
+                  item.category_id
+                )
+            )
+            .filter(Boolean)
+        )
+      ];
+
+
+    if (categories.length) {
+      return categories.join(
+        ", "
+      );
+    }
+  }
+
+
+  return (
+    transaction.category?.name ||
+    findCategoryName(
+      transaction.category_id
+    ) ||
+    "Без категории"
+  );
+}
+
+
+function findCategoryName(id) {
+
+  if (!id) {
+    return null;
+  }
+
+
+  return (
+    state.categories.find(
+      category =>
+        category.id === id
+    )?.name ||
+    null
+  );
+}
+
+
+function transactionSearchText(
+  transaction
+) {
+
+  const parts = [
+    transaction.merchant,
+    transaction.income_source,
+    transaction.comment,
+    transaction.date,
+    transaction.category?.name
+  ];
+
+
+  (
+    transaction.transaction_items ||
+    []
+  ).forEach(
+    item => {
+
+      parts.push(
+        item.name
+      );
+
+      parts.push(
+        item.category?.name
+      );
+    }
+  );
+
+
+  return parts
+    .filter(Boolean)
+    .join(" ");
+}
+
+
+function aggregateCategories(
+  transactions
+) {
+
+  const groups =
+    new Map();
+
+
+  transactions.forEach(
+    transaction => {
+
+      const items =
+        transaction.transaction_items ||
+        [];
+
+
+      if (items.length) {
+
+        items.forEach(
+          item => {
+
+            const name =
+              item.category?.name ||
+              findCategoryName(
+                item.category_id
+              ) ||
+              "Без категории";
+
+
+            addToMap(
+              groups,
+              name,
+              Number(
+                item.amount
+              )
+            );
+          }
+        );
+
+      } else {
+
+        const name =
+          transaction.category?.name ||
+          findCategoryName(
+            transaction.category_id
+          ) ||
+          "Без категории";
+
+
+        addToMap(
+          groups,
+          name,
+          Number(
+            transaction.amount
+          )
+        );
+      }
+    }
+  );
+
+
+  return groups;
+}
+
+
+function addToMap(
+  map,
+  key,
+  amount
+) {
+
+  map.set(
+    key,
+    (
+      map.get(key) || 0
+    ) + (
+      Number(amount) || 0
+    )
+  );
 }
 
 
@@ -2513,122 +4619,499 @@ function setMonthUI() {
 ========================================================= */
 
 function openModal(id) {
-  $(`#${id}`).classList.remove("hidden");
+
+  const modal =
+    document.getElementById(id);
+
+  if (!modal) {
+    return;
+  }
+
+
+  modal.classList.remove(
+    "hidden"
+  );
+
+
+  document.body.classList.add(
+    "modal-open"
+  );
 }
 
+
 function closeModal(id) {
-  $(`#${id}`).classList.add("hidden");
+
+  const modal =
+    document.getElementById(id);
+
+  if (!modal) {
+    return;
+  }
+
+
+  modal.classList.add(
+    "hidden"
+  );
+
+
+  if (
+    !$(".modal:not(.hidden)")
+  ) {
+    document.body.classList.remove(
+      "modal-open"
+    );
+  }
+}
+
+
+function closeAllModals() {
+
+  $$(".modal").forEach(
+    modal =>
+      modal.classList.add(
+        "hidden"
+      )
+  );
+
+
+  document.body.classList.remove(
+    "modal-open"
+  );
 }
 
 
 /* =========================================================
-   UTILITIES
+   UI STATE
 ========================================================= */
 
-function getMonthKey(date) {
+function setLoading(value) {
+
+  state.loading =
+    Boolean(value);
+
+
+  document.body.classList.toggle(
+    "is-loading",
+    state.loading
+  );
+}
+
+
+function setSaving(value) {
+
+  state.saving =
+    Boolean(value);
+
+
+  const button =
+    $("#transaction-form")
+      ?.querySelector(
+        'button[type="submit"]'
+      );
+
+
+  if (!button) {
+    return;
+  }
+
+
+  button.disabled =
+    state.saving;
+
+
+  button.textContent =
+    state.saving
+      ? "Сохраняем..."
+      : "Сохранить";
+}
+
+
+/* =========================================================
+   TOAST
+========================================================= */
+
+function showToast(
+  message,
+  type = "success"
+) {
+
+  const container =
+    $("#toast-container");
+
+
+  if (!container) {
+
+    console[
+      type === "error"
+        ? "error"
+        : "log"
+    ](message);
+
+    return;
+  }
+
+
+  const toast =
+    document.createElement(
+      "div"
+    );
+
+
+  toast.className =
+    `toast ${type}`;
+
+
+  toast.textContent =
+    message;
+
+
+  container.appendChild(
+    toast
+  );
+
+
+  requestAnimationFrame(
+    () => {
+      toast.classList.add(
+        "visible"
+      );
+    }
+  );
+
+
+  setTimeout(
+    () => {
+
+      toast.classList.remove(
+        "visible"
+      );
+
+      setTimeout(
+        () => toast.remove(),
+        250
+      );
+
+    },
+    3000
+  );
+}
+
+
+/* =========================================================
+   FORMATTERS
+========================================================= */
+
+function money(value) {
+
+  const number =
+    Number(value) || 0;
+
+
+  return (
+    new Intl.NumberFormat(
+      "ru-RU",
+      {
+        maximumFractionDigits: 2,
+        minimumFractionDigits:
+          Number.isInteger(number)
+            ? 0
+            : 2
+      }
+    )
+      .format(number)
+      + " ₽"
+  );
+}
+
+
+function formatDate(value) {
+
+  if (!value) {
+    return "";
+  }
+
+
+  const date =
+    new Date(
+      `${value}T00:00:00`
+    );
+
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return value;
+  }
+
+
+  return new Intl.DateTimeFormat(
+    "ru-RU",
+    {
+      day: "numeric",
+      month: "short"
+    }
+  ).format(date);
+}
+
+
+function dateToString(date) {
 
   return [
     date.getFullYear(),
-    pad(date.getMonth() + 1)
+    pad(
+      date.getMonth() + 1
+    ),
+    pad(
+      date.getDate()
+    )
   ].join("-");
 }
 
 
-function formatDate(date) {
+function transactionDateForNewTransaction() {
 
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate())
-  ].join("-");
-}
-
-
-function formatDateHuman(dateString) {
-
-  const [year, month, day] =
-    dateString.split("-").map(Number);
-
-  return `${pad(day)}.${pad(month)}.${year}`;
+  return dateToString(
+    new Date()
+  );
 }
 
 
 function pad(value) {
-  return String(value).padStart(2, "0");
+
+  return String(
+    value
+  ).padStart(
+    2,
+    "0"
+  );
 }
 
 
-function money(value) {
+function roundMoney(value) {
 
-  return new Intl.NumberFormat(
-    "ru-RU",
-    {
-      style: "currency",
-      currency: "RUB",
-      maximumFractionDigits: 0
-    }
-  ).format(Number(value) || 0);
+  return Math.round(
+    (
+      Number(value) || 0
+    ) * 100
+  ) / 100;
 }
 
 
 function sum(values) {
+
   return values.reduce(
-    (total, value) => total + Number(value),
+    (
+      total,
+      value
+    ) =>
+      total +
+      (
+        Number(value) || 0
+      ),
     0
   );
 }
 
 
-function emptyState(text) {
+/* =========================================================
+   HTML SAFETY
+========================================================= */
+
+function escapeHtml(value) {
+
+  return String(
+    value ?? ""
+  )
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+}
+
+
+function escapeHtmlAttribute(
+  value
+) {
+  return escapeHtml(value);
+}
+
+
+function escapeJs(value) {
+
+  return String(
+    value ?? ""
+  )
+    .replace(
+      /\\/g,
+      "\\\\"
+    )
+    .replace(
+      /'/g,
+      "\\'"
+    )
+    .replace(
+      /\n/g,
+      "\\n"
+    )
+    .replace(
+      /\r/g,
+      "\\r"
+    );
+}
+
+
+function emptyState(message) {
 
   return `
     <div class="empty-state">
-      ${escapeHtml(text)}
+      ${escapeHtml(message)}
     </div>
   `;
 }
 
 
-function escapeHtml(value) {
+/* =========================================================
+   ERRORS
+========================================================= */
 
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function getErrorMessage(error) {
+
+  if (!error) {
+    return "Произошла неизвестная ошибка.";
+  }
+
+
+  if (
+    error.code === "23505"
+  ) {
+    return "Такая запись уже существует.";
+  }
+
+
+  if (
+    error.code === "23503"
+  ) {
+    return "Нельзя удалить запись, которая используется другими данными.";
+  }
+
+
+  if (
+    error.code === "42501"
+  ) {
+    return "Недостаточно прав для этой операции.";
+  }
+
+
+  if (
+    error.message
+  ) {
+    return error.message;
+  }
+
+
+  return "Не удалось выполнить операцию.";
 }
 
 
-function escapeAttribute(value) {
-  return escapeHtml(value);
-}
+/* =========================================================
+   DOWNLOAD
+========================================================= */
+
+function downloadFile(
+  content,
+  filename,
+  type
+) {
+
+  const blob =
+    new Blob(
+      [content],
+      {
+        type
+      }
+    );
 
 
-function toast(message) {
-
-  const element =
-    document.createElement("div");
-
-  element.className = "toast";
-
-  element.textContent = message;
-
-  $("#toast-container").appendChild(element);
+  const url =
+    URL.createObjectURL(
+      blob
+    );
 
 
-  setTimeout(() => {
-    element.remove();
-  }, 3000);
-}
+  const link =
+    document.createElement(
+      "a"
+    );
 
 
-function handleDbError(error) {
+  link.href =
+    url;
 
-  console.error(error);
+  link.download =
+    filename;
 
-  toast(
-    error?.message ||
-    "Произошла ошибка при работе с базой данных."
+
+  document.body.appendChild(
+    link
+  );
+
+
+  link.click();
+
+  link.remove();
+
+
+  setTimeout(
+    () => {
+      URL.revokeObjectURL(
+        url
+      );
+    },
+    1000
   );
 }
+
+
+/* =========================================================
+   GLOBAL HANDLERS
+========================================================= */
+
+/*
+  Оставляем эти функции глобальными,
+  потому что текущий HTML использует
+  inline onclick для редактирования,
+  удаления категорий и т.д.
+*/
+
+window.editTransaction =
+  editTransaction;
+
+window.deleteTransaction =
+  deleteTransaction;
+
+window.deleteCategory =
+  deleteCategory;
+
+window.deleteMerchant =
+  deleteMerchant;
+
+window.deleteBudget =
+  deleteBudget;
