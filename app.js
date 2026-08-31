@@ -429,6 +429,28 @@ function setupEvents() {
     }
   );
 
+  $("#quick-add-subcategory")?.addEventListener(
+  "click",
+  () => {
+
+    const parentId =
+      getSelectedTransactionMainCategoryId();
+
+    if (!parentId) {
+      showToast(
+        "Сначала выберите основную категорию.",
+        "error"
+      );
+
+      return;
+    }
+
+    openQuickCategoryModal(
+      parentId
+    );
+  }
+);
+
 
   $("#quick-category-form")?.addEventListener(
     "submit",
@@ -2081,6 +2103,16 @@ function handleMainCategoryChange(
     return;
   }
 
+  const category =
+    getCategory(categoryId);
+
+  if (
+    !category ||
+    category.parent_id !== null
+  ) {
+    return;
+  }
+
   setValue(
     "#transaction-category",
     categoryId
@@ -2091,6 +2123,13 @@ function handleMainCategoryChange(
   );
 
   refreshAllItemCategoryOptions();
+
+  const subcategoryButton =
+    $("#quick-add-subcategory");
+
+  if (subcategoryButton) {
+    subcategoryButton.disabled = false;
+  }
 }
 
 
@@ -2198,9 +2237,12 @@ function populateItemCategorySelect(
   select.innerHTML = "";
 
   const emptyOption =
-    document.createElement("option");
+    document.createElement(
+      "option"
+    );
 
   emptyOption.value = "";
+
   emptyOption.textContent =
     children.length
       ? "Без подкатегории"
@@ -2210,19 +2252,25 @@ function populateItemCategorySelect(
     emptyOption
   );
 
-  children.forEach(category => {
+  children.forEach(
+    category => {
 
-    const option =
-      document.createElement("option");
+      const option =
+        document.createElement(
+          "option"
+        );
 
-    option.value =
-      category.id;
+      option.value =
+        category.id;
 
-    option.textContent =
-      category.name;
+      option.textContent =
+        category.name;
 
-    select.appendChild(option);
-  });
+      select.appendChild(
+        option
+      );
+    }
+  );
 
   if (
     selectedId &&
@@ -2231,10 +2279,14 @@ function populateItemCategorySelect(
         category.id === selectedId
     )
   ) {
+
     select.value =
       selectedId;
+
   } else {
-    select.value = "";
+
+    select.value =
+      "";
   }
 
   select.disabled =
@@ -3264,24 +3316,31 @@ async function addQuickCategory(event) {
           category.parent_id === parentId
       );
 
-    if (
-      newCategory &&
-      newCategory.parent_id
-    ) {
+if (
+  newCategory &&
+  newCategory.parent_id
+) {
 
-      const mainId =
-        newCategory.parent_id;
+  const mainId =
+    newCategory.parent_id;
 
-      setValue(
-        "#transaction-category",
-        mainId
-      );
+  handleMainCategoryChange(
+    mainId
+  );
 
-      renderTransactionCategoryChips(
-        mainId
-      );
+} else if (newCategory) {
 
-      refreshAllItemCategoryOptions();
+  setValue(
+    "#transaction-category",
+    newCategory.id
+  );
+
+  renderTransactionCategoryChips(
+    newCategory.id
+  );
+
+  refreshAllItemCategoryOptions();
+}
 
     } else if (newCategory) {
 
