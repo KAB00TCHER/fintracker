@@ -811,7 +811,29 @@ function handleDelegatedActions(event) {
   }
 
 
-  
+  const addChildCategoryButton =
+    event.target.closest(
+      "[data-add-child-category]"
+    );
+
+  if (addChildCategoryButton) {
+
+    event.preventDefault();
+
+    const parentId =
+      addChildCategoryButton.dataset
+        .addChildCategory;
+
+    if (!parentId) {
+      return;
+    }
+
+    openQuickCategoryModal(
+      parentId
+    );
+
+    return;
+  }
 
 
   const deleteMerchantButton =
@@ -3036,7 +3058,18 @@ function openQuickCategoryModal(
 
   if (parentSelect) {
 
-    populateQuickCategoryParents();
+    const parent =
+      parentId
+        ? getCategory(parentId)
+        : null;
+
+    const type =
+      parent?.type ||
+      state.transactionType;
+
+    populateQuickCategoryParents(
+      type
+    );
 
     parentSelect.value =
       parentId || "";
@@ -3099,7 +3132,9 @@ function ensureQuickCategoryParentField() {
 }
 
 
-function populateQuickCategoryParents() {
+function populateQuickCategoryParents(
+  type = null
+) {
 
   const select =
     $("#quick-category-parent");
@@ -3114,13 +3149,20 @@ function populateQuickCategoryParents() {
     </option>
   `;
 
-  const type =
-    state.transactionType;
+  const categoryType =
+    type === "income" ||
+    type === "expense"
+      ? type
+      : (
+          state.transactionType === "income"
+            ? "income"
+            : "expense"
+        );
 
   state.categories
     .filter(
       category =>
-        category.type === type &&
+        category.type === categoryType &&
         category.parent_id === null
     )
     .sort(
@@ -3143,7 +3185,9 @@ function populateQuickCategoryParents() {
       option.textContent =
         category.name;
 
-      select.appendChild(option);
+      select.appendChild(
+        option
+      );
     });
 }
 
@@ -3164,7 +3208,7 @@ async function addQuickCategory(event) {
     return;
   }
 
-  const type =
+  let type =
     state.transactionType === "income"
       ? "income"
       : "expense";
@@ -3176,8 +3220,7 @@ async function addQuickCategory(event) {
 
     if (
       !parent ||
-      parent.parent_id !== null ||
-      parent.type !== type
+      parent.parent_id !== null
     ) {
       showToast(
         "Некорректная родительская категория.",
@@ -3186,6 +3229,9 @@ async function addQuickCategory(event) {
 
       return;
     }
+
+    type =
+      parent.type;
   }
 
   try {
@@ -3217,12 +3263,6 @@ async function addQuickCategory(event) {
           category.type === type &&
           category.parent_id === parentId
       );
-
-    /*
-      Если создавали подкатегорию,
-      автоматически оставляем текущую
-      основную категорию и не ломаем форму.
-    */
 
     if (
       newCategory &&
@@ -3453,42 +3493,6 @@ function renderCategoriesSettings() {
         .join("")}
     </div>
   `;
-
-  /*
-    Кнопки подкатегорий создаются через innerHTML,
-    поэтому навешиваем обработчик после рендера
-    непосредственно на контейнер дерева.
-
-    Это надёжнее общего document.click:
-    обработчик работает и после каждого
-    повторного renderSettings().
-  */
-  container
-    .querySelectorAll(
-      "[data-add-child-category]"
-    )
-    .forEach(button => {
-
-      button.addEventListener(
-        "click",
-        event => {
-
-          event.preventDefault();
-          event.stopPropagation();
-
-          const parentId =
-            button.dataset.addChildCategory;
-
-          if (!parentId) {
-            return;
-          }
-
-          openQuickCategoryModal(
-            parentId
-          );
-        }
-      );
-    });
 }
 
 
