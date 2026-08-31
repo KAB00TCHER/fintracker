@@ -2718,6 +2718,150 @@ function incomeCategories() {
   );
 }
 
+function getTransactionCategories() {
+
+  if (state.transactionType === "income") {
+    return incomeCategories();
+  }
+
+  return expenseCategories();
+}
+
+
+function populateTransactionCategories(
+  selectedId = null
+) {
+
+  const select =
+    $("#transaction-category");
+
+  if (!select) {
+    return;
+  }
+
+
+  const categories =
+    getTransactionCategories();
+
+
+  select.innerHTML = "";
+
+
+  categories.forEach(category => {
+
+    const option =
+      document.createElement("option");
+
+    option.value =
+      category.id;
+
+    option.textContent =
+      category.name;
+
+    select.appendChild(option);
+
+  });
+
+
+  if (selectedId) {
+
+    select.value =
+      selectedId;
+
+  }
+
+
+  /*
+    Если категория не была выбрана,
+    автоматически выбираем первую.
+  */
+
+  if (
+    !select.value &&
+    categories.length
+  ) {
+
+    select.value =
+      categories[0].id;
+
+  }
+
+
+  renderTransactionCategoryChips(
+    select.value
+  );
+}
+
+
+function renderTransactionCategoryChips(
+  selectedId
+) {
+
+  const container =
+    $("#transaction-category-chips");
+
+  if (!container) {
+    return;
+  }
+
+
+  const categories =
+    getTransactionCategories();
+
+
+  container.innerHTML =
+    categories
+      .map(category => {
+
+        const active =
+          String(category.id) ===
+          String(selectedId);
+
+
+        return `
+          <button
+            type="button"
+            class="transaction-category-chip ${active ? "active" : ""}"
+            data-category-id="${escapeHtmlAttribute(category.id)}"
+          >
+            ${escapeHtml(category.name)}
+          </button>
+        `;
+
+      })
+      .join("");
+
+
+  container
+    .querySelectorAll(
+      "[data-category-id]"
+    )
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          const id =
+            button.dataset.categoryId;
+
+
+          setValue(
+            "#transaction-category",
+            id
+          );
+
+
+          renderTransactionCategoryChips(
+            id
+          );
+
+        }
+      );
+
+    });
+}
+
 
 function populateCategoryFilters() {
 
