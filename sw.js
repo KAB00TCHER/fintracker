@@ -1,4 +1,4 @@
-const CACHE_NAME = "fintracker-v2";
+const CACHE_NAME = "fintracker-v3";
 
 const APP_SHELL = [
   "/",

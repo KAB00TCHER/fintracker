@@ -811,18 +811,7 @@ function handleDelegatedActions(event) {
   }
 
 
-  const addChildCategoryButton =
-    event.target.closest(
-      "[data-add-child-category]"
-    );
-
-  if (addChildCategoryButton) {
-    openQuickCategoryModal(
-      addChildCategoryButton.dataset.addChildCategory
-    );
-
-    return;
-  }
+  
 
 
   const deleteMerchantButton =
@@ -3457,12 +3446,49 @@ function renderCategoriesSettings() {
     return;
   }
 
-  container.innerHTML =
-    `
-      <div class="category-tree">
-        ${roots.map(renderCategoryTreeNode).join("")}
-      </div>
-    `;
+  container.innerHTML = `
+    <div class="category-tree">
+      ${roots
+        .map(renderCategoryTreeNode)
+        .join("")}
+    </div>
+  `;
+
+  /*
+    Кнопки подкатегорий создаются через innerHTML,
+    поэтому навешиваем обработчик после рендера
+    непосредственно на контейнер дерева.
+
+    Это надёжнее общего document.click:
+    обработчик работает и после каждого
+    повторного renderSettings().
+  */
+  container
+    .querySelectorAll(
+      "[data-add-child-category]"
+    )
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        event => {
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          const parentId =
+            button.dataset.addChildCategory;
+
+          if (!parentId) {
+            return;
+          }
+
+          openQuickCategoryModal(
+            parentId
+          );
+        }
+      );
+    });
 }
 
 
