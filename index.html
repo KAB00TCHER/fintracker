@@ -1,0 +1,599 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5f3ef">
+  <title>Мои деньги</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- AUTH -->
+
+  <section id="auth-screen" class="screen auth-screen hidden">
+    <div class="auth-card">
+      <div class="brand">
+        <div class="brand-mark">₽</div>
+        <div>
+          <h1>Мои деньги</h1>
+          <p>Личный трекер финансов</p>
+        </div>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-auth-tab="login">Войти</button>
+        <button class="auth-tab" data-auth-tab="register">Регистрация</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <label>
+          Почта
+          <input id="login-email" type="email" autocomplete="email" required>
+        </label>
+
+        <label>
+          Пароль
+          <input id="login-password" type="password" autocomplete="current-password" required>
+        </label>
+
+        <button class="primary-button" type="submit">Войти</button>
+
+        <button id="forgot-password" class="text-button" type="button">
+          Забыли пароль?
+        </button>
+      </form>
+
+      <form id="register-form" class="auth-form hidden">
+        <label>
+          Почта
+          <input id="register-email" type="email" autocomplete="email" required>
+        </label>
+
+        <label>
+          Пароль
+          <input id="register-password" type="password" autocomplete="new-password" minlength="6" required>
+        </label>
+
+        <label>
+          Повторите пароль
+          <input id="register-password-confirm" type="password" autocomplete="new-password" minlength="6" required>
+        </label>
+
+        <button class="primary-button" type="submit">Создать аккаунт</button>
+      </form>
+
+      <div id="auth-message" class="form-message"></div>
+    </div>
+  </section>
+
+
+  <!-- MAIN APP -->
+
+  <section id="main-screen" class="screen hidden">
+
+    <header class="topbar">
+      <div class="topbar-brand">
+        <div class="brand-mark small">₽</div>
+        <span>Мои деньги</span>
+      </div>
+
+      <div class="topbar-actions">
+        <button id="month-picker-button" class="month-button"></button>
+        <button id="user-menu-button" class="user-button">•••</button>
+      </div>
+
+      <div id="user-menu" class="user-menu hidden">
+        <div id="user-email" class="user-email"></div>
+        <button id="export-data">Экспорт данных</button>
+        <button id="logout-button">Выйти</button>
+      </div>
+    </header>
+
+
+    <main class="content">
+
+      <!-- DASHBOARD -->
+
+      <section id="page-dashboard" class="page active">
+
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Обзор</p>
+            <h2 id="dashboard-month-title">Август 2026</h2>
+          </div>
+
+          <div class="quick-actions">
+            <button id="quick-expense" class="primary-button">
+              + Расход
+            </button>
+            <button id="quick-income" class="secondary-button">
+              + Доход
+            </button>
+          </div>
+        </div>
+
+
+        <div class="summary-grid">
+
+          <article class="summary-card balance">
+            <span>Баланс</span>
+            <strong id="balance-value">0 ₽</strong>
+            <small id="balance-caption">за всё время</small>
+          </article>
+
+          <article class="summary-card income">
+            <span>Доходы</span>
+            <strong id="income-value">0 ₽</strong>
+            <small id="income-caption">за месяц</small>
+          </article>
+
+          <article class="summary-card expense">
+            <span>Расходы</span>
+            <strong id="expense-value">0 ₽</strong>
+            <small id="expense-caption">за месяц</small>
+          </article>
+
+          <article class="summary-card remaining">
+            <span>Свободно</span>
+            <strong id="remaining-value">0 ₽</strong>
+            <small id="remaining-caption">до конца месяца</small>
+          </article>
+
+        </div>
+
+
+        <div class="dashboard-grid">
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Расходы по категориям</h3>
+                <p>За выбранный месяц</p>
+              </div>
+              <button class="link-button" data-page="analytics">Подробнее</button>
+            </div>
+
+            <div id="category-overview" class="category-overview"></div>
+          </article>
+
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Последние операции</h3>
+                <p>Самые свежие записи</p>
+              </div>
+              <button class="link-button" data-page="transactions">Все</button>
+            </div>
+
+            <div id="recent-transactions" class="transaction-list"></div>
+          </article>
+
+        </div>
+
+
+        <article class="panel attention-panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Куда можно посмотреть</h3>
+              <p>Автоматически найденные изменения расходов</p>
+            </div>
+          </div>
+
+          <div id="insights" class="insights"></div>
+        </article>
+
+      </section>
+
+
+      <!-- TRANSACTIONS -->
+
+      <section id="page-transactions" class="page">
+
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">История</p>
+            <h2>Операции</h2>
+          </div>
+
+          <button id="transactions-add" class="primary-button">
+            + Добавить
+          </button>
+        </div>
+
+
+        <div class="filters panel">
+
+          <label>
+            Поиск
+            <input id="transaction-search" type="search" placeholder="Магазин, товар, комментарий">
+          </label>
+
+          <label>
+            Тип
+            <select id="transaction-type-filter">
+              <option value="all">Все</option>
+              <option value="expense">Расходы</option>
+              <option value="income">Доходы</option>
+            </select>
+          </label>
+
+          <label>
+            Категория
+            <select id="transaction-category-filter">
+              <option value="all">Все категории</option>
+            </select>
+          </label>
+
+        </div>
+
+        <div class="panel">
+          <div id="all-transactions" class="transaction-list full"></div>
+        </div>
+
+      </section>
+
+
+      <!-- ANALYTICS -->
+
+      <section id="page-analytics" class="page">
+
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Анализ</p>
+            <h2>Куда уходят деньги</h2>
+          </div>
+        </div>
+
+
+        <div class="analytics-periods">
+          <button class="period-button active" data-period="month">Месяц</button>
+          <button class="period-button" data-period="3months">3 месяца</button>
+          <button class="period-button" data-period="year">Год</button>
+        </div>
+
+
+        <div class="analytics-grid">
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Категории</h3>
+                <p id="analytics-category-caption"></p>
+              </div>
+            </div>
+
+            <div id="analytics-categories"></div>
+          </article>
+
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Магазины и места</h3>
+                <p>Где остаётся больше всего денег</p>
+              </div>
+            </div>
+
+            <div id="analytics-merchants"></div>
+          </article>
+
+
+          <article class="panel wide">
+            <div class="panel-heading">
+              <div>
+                <h3>Конкретные товары</h3>
+                <p>Самые крупные позиции расходов</p>
+              </div>
+            </div>
+
+            <div id="analytics-items"></div>
+          </article>
+
+        </div>
+
+      </section>
+
+
+      <!-- BUDGETS -->
+
+      <section id="page-budgets" class="page">
+
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Планирование</p>
+            <h2>Бюджеты</h2>
+          </div>
+
+          <button id="add-budget-button" class="primary-button">
+            + Лимит
+          </button>
+        </div>
+
+        <div id="budgets-list" class="budgets-grid"></div>
+
+      </section>
+
+
+      <!-- SETTINGS -->
+
+      <section id="page-settings" class="page">
+
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Настройки</p>
+            <h2>Справочники</h2>
+          </div>
+        </div>
+
+
+        <div class="settings-grid">
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Категории</h3>
+                <p>Используются при добавлении операций</p>
+              </div>
+            </div>
+
+            <div id="categories-settings"></div>
+
+            <form id="category-form" class="inline-form">
+              <input id="new-category-name" placeholder="Новая категория" required>
+              <select id="new-category-type">
+                <option value="expense">Расход</option>
+                <option value="income">Доход</option>
+              </select>
+              <button class="secondary-button" type="submit">Добавить</button>
+            </form>
+          </article>
+
+
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Магазины</h3>
+                <p>Часто используемые места</p>
+              </div>
+            </div>
+
+            <div id="merchants-settings"></div>
+
+            <form id="merchant-form" class="inline-form">
+              <input id="new-merchant-name" placeholder="Название магазина" required>
+              <button class="secondary-button" type="submit">Добавить</button>
+            </form>
+          </article>
+
+        </div>
+
+      </section>
+
+    </main>
+
+
+    <!-- BOTTOM NAV -->
+
+    <nav class="bottom-nav">
+
+      <button class="nav-button active" data-page="dashboard">
+        <span>⌂</span>
+        Главная
+      </button>
+
+      <button class="nav-button" data-page="transactions">
+        <span>☷</span>
+        Операции
+      </button>
+
+      <button class="nav-button" data-page="analytics">
+        <span>◒</span>
+        Аналитика
+      </button>
+
+      <button class="nav-button" data-page="budgets">
+        <span>▤</span>
+        Лимиты
+      </button>
+
+      <button class="nav-button" data-page="settings">
+        <span>⚙</span>
+        Настройки
+      </button>
+
+    </nav>
+
+  </section>
+
+
+  <!-- TRANSACTION MODAL -->
+
+  <div id="transaction-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-card large">
+
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow" id="transaction-modal-eyebrow">Новая операция</p>
+          <h2 id="transaction-modal-title">Расход</h2>
+        </div>
+
+        <button class="close-button" data-close-modal="transaction-modal">×</button>
+      </div>
+
+
+      <div class="transaction-type-tabs">
+        <button class="transaction-type active" data-transaction-type="expense">
+          Расход
+        </button>
+
+        <button class="transaction-type" data-transaction-type="income">
+          Доход
+        </button>
+      </div>
+
+
+      <form id="transaction-form">
+
+        <input id="transaction-id" type="hidden">
+
+        <div class="form-grid">
+
+          <label>
+            Сумма
+            <input id="transaction-amount" type="number" min="0.01" step="0.01" placeholder="0" required>
+          </label>
+
+          <label>
+            Дата
+            <input id="transaction-date" type="date" required>
+          </label>
+
+          <label class="expense-only">
+            Магазин / место
+            <input id="transaction-merchant" list="merchant-options" placeholder="Например, Пятёрочка">
+            <datalist id="merchant-options"></datalist>
+          </label>
+
+          <label class="income-only hidden">
+            Источник дохода
+            <input id="transaction-income-source" placeholder="Например, зарплата">
+          </label>
+
+        </div>
+
+
+        <div id="expense-items-section" class="expense-only">
+
+          <div class="section-heading">
+            <div>
+              <h3>Состав покупки</h3>
+              <p>Можно оставить пустым или разобрать чек подробно</p>
+            </div>
+
+            <button id="add-item-button" class="secondary-button small-button" type="button">
+              + Позиция
+            </button>
+          </div>
+
+          <div id="transaction-items"></div>
+
+          <div class="items-summary">
+            <span>Сумма позиций</span>
+            <strong id="items-total">0 ₽</strong>
+          </div>
+
+          <div id="items-validation" class="validation-message"></div>
+
+        </div>
+
+
+        <label>
+          Комментарий
+          <textarea id="transaction-comment" rows="3" placeholder="Необязательно"></textarea>
+        </label>
+
+
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" data-close-modal="transaction-modal">
+            Отмена
+          </button>
+
+          <button class="primary-button" type="submit">
+            Сохранить
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+
+
+  <!-- BUDGET MODAL -->
+
+  <div id="budget-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-card">
+
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Планирование</p>
+          <h2>Месячный лимит</h2>
+        </div>
+
+        <button class="close-button" data-close-modal="budget-modal">×</button>
+      </div>
+
+      <form id="budget-form">
+
+        <label>
+          Категория
+          <select id="budget-category" required></select>
+        </label>
+
+        <label>
+          Лимит
+          <input id="budget-amount" type="number" min="1" step="1" required>
+        </label>
+
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" data-close-modal="budget-modal">
+            Отмена
+          </button>
+
+          <button class="primary-button" type="submit">
+            Сохранить
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+
+
+  <!-- MONTH MODAL -->
+
+  <div id="month-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-card">
+
+      <div class="modal-header">
+        <h2>Выбрать месяц</h2>
+        <button class="close-button" data-close-modal="month-modal">×</button>
+      </div>
+
+      <label>
+        Месяц
+        <input id="month-input" type="month">
+      </label>
+
+      <div class="modal-actions">
+        <button id="month-save" class="primary-button" type="button">
+          Применить
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <div id="toast-container"></div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
