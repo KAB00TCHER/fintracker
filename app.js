@@ -3316,7 +3316,7 @@ async function addQuickCategory(event) {
           category.parent_id === parentId
       );
 
-if (
+    if (
   newCategory &&
   newCategory.parent_id
 ) {
@@ -3340,9 +3340,7 @@ if (
   );
 
   refreshAllItemCategoryOptions();
-}
-
-    } else if (newCategory) {
+} else if (newCategory) {
 
       setValue(
         "#transaction-category",
