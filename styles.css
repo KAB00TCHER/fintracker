@@ -1,5 +1,6 @@
 /* =========================================================
-   FINTRACKER — MOBILE FIRST
+   FINTRACKER
+   MOBILE FIRST
    ========================================================= */
 
 :root {
@@ -45,13 +46,14 @@
   --bottom-nav-height: 68px;
   --topbar-height: 64px;
 
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-bottom:
+    env(safe-area-inset-bottom, 0px);
 }
 
 
 /* =========================================================
    RESET
-   ========================================================= */
+========================================================= */
 
 *,
 *::before,
@@ -62,11 +64,13 @@
 html {
   min-height: 100%;
   background: var(--bg);
+
   -webkit-text-size-adjust: 100%;
 }
 
 body {
   min-height: 100vh;
+
   margin: 0;
 
   background: var(--bg);
@@ -88,6 +92,14 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
+body.is-loading {
+  cursor: progress;
+}
+
 button,
 input,
 select,
@@ -97,20 +109,13 @@ textarea {
 
 button {
   cursor: pointer;
+
   -webkit-tap-highlight-color: transparent;
 }
 
 button:disabled {
   cursor: not-allowed;
   opacity: .5;
-}
-
-a {
-  color: inherit;
-}
-
-img {
-  max-width: 100%;
 }
 
 input,
@@ -163,13 +168,10 @@ textarea {
   resize: vertical;
 }
 
-select {
-  appearance: auto;
-}
-
 label {
   display: flex;
   flex-direction: column;
+
   gap: 7px;
 
   color: var(--text-soft);
@@ -184,17 +186,11 @@ label {
 
 
 /* =========================================================
-   APP / SCREENS
-   ========================================================= */
+   APP
+========================================================= */
 
-#app {
-  min-height: 100vh;
-}
-
-.screen {
-  min-height: 100vh;
-}
-
+#app,
+.screen,
 #main-screen {
   min-height: 100vh;
 }
@@ -202,7 +198,7 @@ label {
 
 /* =========================================================
    AUTH
-   ========================================================= */
+========================================================= */
 
 .auth-screen {
   min-height: 100vh;
@@ -330,8 +326,8 @@ label {
   min-height: 36px;
 
   border: 0;
-  background: transparent;
 
+  background: transparent;
   color: var(--accent);
 
   font-size: 13px;
@@ -348,18 +344,10 @@ label {
   font-size: 13px;
 }
 
-.form-message.error {
-  color: var(--danger);
-}
-
-.form-message.success {
-  color: var(--income);
-}
-
 
 /* =========================================================
    BUTTONS
-   ========================================================= */
+========================================================= */
 
 .primary-button,
 .secondary-button {
@@ -411,22 +399,14 @@ label {
   background: #dce8e1;
 }
 
-.small-button {
-  min-height: 38px;
-
-  padding: 8px 12px;
-
-  font-size: 13px;
-}
-
 .link-button {
   min-height: 36px;
 
   padding: 5px 0;
 
   border: 0;
-  background: transparent;
 
+  background: transparent;
   color: var(--accent);
 
   font-size: 13px;
@@ -463,10 +443,31 @@ label {
   color: var(--text);
 }
 
+.icon-button {
+  width: 32px;
+  height: 32px;
+
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 8px;
+
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-button:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
 
 /* =========================================================
    TOPBAR
-   ========================================================= */
+========================================================= */
 
 .topbar {
   height: var(--topbar-height);
@@ -599,10 +600,10 @@ label {
   border-radius: 9px;
 
   background: transparent;
-
   color: var(--text);
 
   text-align: left;
+
   font-size: 13px;
   font-weight: 600;
 }
@@ -626,16 +627,23 @@ label {
 
 /* =========================================================
    CONTENT
-   ========================================================= */
+========================================================= */
 
 .content {
-  width: min(var(--content-width), calc(100% - 32px));
+  width: min(
+    var(--content-width),
+    calc(100% - 32px)
+  );
 
   margin: 0 auto;
 
   padding:
     24px 0
-    calc(var(--bottom-nav-height) + var(--safe-bottom) + 28px);
+    calc(
+      var(--bottom-nav-height) +
+      var(--safe-bottom) +
+      28px
+    );
 }
 
 .page {
@@ -645,7 +653,8 @@ label {
 .page.active {
   display: block;
 
-  animation: page-in .16s ease-out;
+  animation:
+    page-in .16s ease-out;
 }
 
 @keyframes page-in {
@@ -690,11 +699,6 @@ label {
   text-transform: uppercase;
 }
 
-
-/* =========================================================
-   QUICK ACTIONS
-   ========================================================= */
-
 .quick-actions {
   display: flex;
   gap: 7px;
@@ -703,7 +707,7 @@ label {
 
 /* =========================================================
    SUMMARY
-   ========================================================= */
+========================================================= */
 
 .summary-grid {
   display: grid;
@@ -772,7 +776,7 @@ label {
 
 /* =========================================================
    PANELS
-   ========================================================= */
+========================================================= */
 
 .panel {
   margin-bottom: 15px;
@@ -821,25 +825,13 @@ label {
 
 /* =========================================================
    CATEGORY OVERVIEW
-   ========================================================= */
+========================================================= */
 
 .category-overview {
   display: flex;
   flex-direction: column;
 
   gap: 14px;
-}
-
-.category-row {
-  display: grid;
-
-  grid-template-columns: minmax(0, 1fr);
-
-  gap: 8px;
-}
-
-.category-main {
-  min-width: 0;
 }
 
 .category-name {
@@ -864,8 +856,6 @@ label {
 }
 
 .category-name span:last-child {
-  flex: 0 0 auto;
-
   color: var(--muted);
 
   white-space: nowrap;
@@ -895,7 +885,7 @@ label {
 
 /* =========================================================
    TRANSACTIONS
-   ========================================================= */
+========================================================= */
 
 .transaction-list {
   display: flex;
@@ -1001,40 +991,20 @@ label {
   gap: 2px;
 }
 
-.icon-button {
-  width: 32px;
-  height: 32px;
-
-  display: grid;
-  place-items: center;
-
-  padding: 0;
-
-  border: 0;
-  border-radius: 8px;
-
-  background: transparent;
-  color: var(--muted);
-}
-
-.icon-button:hover {
-  background: var(--surface-soft);
-  color: var(--text);
-}
-
 .empty-state {
   padding: 28px 10px;
 
   color: var(--muted);
 
   text-align: center;
+
   font-size: 13px;
 }
 
 
 /* =========================================================
    INSIGHTS
-   ========================================================= */
+========================================================= */
 
 .insights {
   display: grid;
@@ -1075,7 +1045,7 @@ label {
 
 /* =========================================================
    FILTERS
-   ========================================================= */
+========================================================= */
 
 .filters {
   display: grid;
@@ -1097,7 +1067,7 @@ label {
 
 /* =========================================================
    ANALYTICS
-   ========================================================= */
+========================================================= */
 
 .analytics-periods {
   display: flex;
@@ -1192,17 +1162,10 @@ label {
   font-size: 11px;
 }
 
-.analytics-item > strong:last-child,
-.analytics-item > span:last-child {
-  margin-top: 0;
-
-  white-space: nowrap;
-}
-
 
 /* =========================================================
    BUDGETS
-   ========================================================= */
+========================================================= */
 
 .budgets-grid {
   display: grid;
@@ -1300,11 +1263,13 @@ label {
   transition: width .25s ease;
 }
 
-.budget-card.warning .budget-progress-bar {
+.budget-card.warning
+.budget-progress-bar {
   background: var(--warning);
 }
 
-.budget-card.danger .budget-progress-bar {
+.budget-card.danger
+.budget-progress-bar {
   background: var(--danger);
 }
 
@@ -1323,7 +1288,7 @@ label {
 
 /* =========================================================
    SETTINGS
-   ========================================================= */
+========================================================= */
 
 .settings-list {
   display: flex;
@@ -1385,23 +1350,195 @@ label {
 
 
 /* =========================================================
-   TRANSACTION FORM
-   ========================================================= */
+   CATEGORY TREE
+========================================================= */
 
-.form-grid {
-  display: grid;
+.category-tree {
+  display: flex;
+  flex-direction: column;
 
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
-
-  gap: 14px;
-
-  margin-bottom: 18px;
+  gap: 12px;
 }
 
-.amount-field input {
+.category-tree-node {
+  overflow: hidden;
+
+  border: 1px solid var(--border);
+  border-radius: 14px;
+
+  background: var(--surface-soft);
+}
+
+.category-tree-parent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  padding: 13px 14px;
+
+  background: var(--surface);
+}
+
+.category-tree-info {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+}
+
+.category-tree-info strong {
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 14px;
+}
+
+.category-type-badge {
+  flex: 0 0 auto;
+
+  padding: 3px 7px;
+
+  border-radius: 999px;
+
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.category-tree-actions {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+
+  gap: 4px;
+}
+
+.category-add-child {
+  min-height: 30px;
+
+  font-size: 11px;
+}
+
+.category-tree-children {
+  padding:
+    0
+    14px
+    9px
+    14px;
+
+  border-top: 1px solid var(--border);
+}
+
+.category-tree-child {
+  min-height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding: 7px 0;
+
+  border-bottom: 1px solid var(--border);
+}
+
+.category-tree-child:last-child {
+  border-bottom: 0;
+}
+
+.category-tree-child-name {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  color: var(--text-soft);
+
+  font-size: 13px;
+}
+
+.category-tree-branch {
+  color: var(--muted);
+
+  font-weight: 700;
+}
+
+.category-empty {
+  display: block;
+
+  padding: 8px 2px;
+
+  color: var(--muted);
+
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   TRANSACTION FORM
+========================================================= */
+
+.transaction-modal-card {
+  width: min(520px, 100%);
+}
+
+.transaction-modal-card form {
+  display: flex;
+  flex-direction: column;
+
+  gap: 17px;
+}
+
+.amount-field {
+  gap: 8px;
+}
+
+.amount-input-wrap {
+  position: relative;
+}
+
+.amount-input-wrap input {
+  height: 76px;
+
+  padding:
+    8px 54px 8px 18px;
+
+  border-radius: 17px;
+
+  font-size: 36px;
+  font-weight: 800;
+
+  letter-spacing: -1px;
+}
+
+.amount-input-wrap > span {
+  position: absolute;
+
+  right: 18px;
+  top: 50%;
+
+  transform:
+    translateY(-50%);
+
+  color: var(--muted);
+
   font-size: 22px;
   font-weight: 700;
+
+  pointer-events: none;
 }
 
 .transaction-type-tabs {
@@ -1413,7 +1550,7 @@ label {
 
   padding: 4px;
 
-  margin-bottom: 20px;
+  margin-bottom: 2px;
 
   background: var(--surface-soft);
 
@@ -1442,86 +1579,154 @@ label {
     0 2px 7px rgba(0, 0, 0, .05);
 }
 
-.section-heading {
+.transaction-category-block {
+  width: 100%;
+}
+
+.transaction-field-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
 
-  gap: 12px;
+  margin-bottom: 8px;
 
-  margin-bottom: 12px;
+  color: var(--text-soft);
+
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.section-heading h3 {
-  margin: 0;
+.transaction-field-heading .link-button {
+  min-height: 28px;
 
-  font-size: 15px;
+  padding: 2px 0;
+
+  font-size: 12px;
 }
 
-.section-heading p {
-  margin: 4px 0 0;
-
-  color: var(--muted);
-
-  font-size: 11px;
+.transaction-category-hidden {
+  display: none;
 }
 
-.transaction-items {
+.transaction-category-chips {
+  display: flex;
+
+  gap: 8px;
+
+  width: 100%;
+
+  overflow-x: auto;
+
+  padding:
+    2px
+    2px
+    7px;
+
+  scrollbar-width: none;
+}
+
+.transaction-category-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.transaction-category-chip {
+  flex: 0 0 auto;
+
+  min-height: 42px;
+
+  padding:
+    9px
+    15px;
+
+  border: 1px solid var(--border);
+
+  border-radius: 12px;
+
+  background: var(--surface);
+  color: var(--text-soft);
+
+  font-size: 13px;
+  font-weight: 650;
+
+  white-space: nowrap;
+
+  transition:
+    background .15s ease,
+    color .15s ease,
+    border-color .15s ease,
+    transform .1s ease;
+}
+
+.transaction-category-chip:active {
+  transform: scale(.97);
+}
+
+.transaction-category-chip.active {
+  background: var(--accent);
+
+  border-color: var(--accent);
+
+  color: #fff;
+}
+
+.transaction-items-section {
+  margin-top: 2px;
+}
+
+#transaction-items {
   display: flex;
   flex-direction: column;
 
   gap: 8px;
 }
 
-.transaction-item {
+.item-row {
   display: grid;
 
   grid-template-columns:
-    minmax(0, 1fr)
-    110px
-    36px;
+    minmax(0, 1.5fr)
+    105px
+    minmax(120px, 1fr)
+    34px;
 
   gap: 7px;
 
   align-items: center;
+
+  padding: 8px;
+
+  background: var(--surface-soft);
+
+  border: 1px solid var(--border);
+
+  border-radius: 13px;
 }
 
-.transaction-item input {
-  min-height: 42px;
+.item-row input,
+.item-row select {
+  min-width: 0;
+
+  min-height: 40px;
+
+  padding:
+    9px
+    10px;
+
+  font-size: 12px;
 }
 
-.items-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.item-row .icon-button {
+  flex: 0 0 auto;
+}
 
-  gap: 10px;
-
-  padding: 12px 0;
-
-  margin-top: 10px;
-
-  border-top: 1px solid var(--border);
+.transaction-items-total {
+  margin-top: 8px;
 
   color: var(--muted);
 
   font-size: 12px;
-}
 
-.items-summary strong {
-  color: var(--text);
-
-  font-size: 14px;
-}
-
-.validation-message {
-  min-height: 18px;
-
-  margin-bottom: 14px;
-
-  color: var(--danger);
-
-  font-size: 12px;
+  text-align: right;
 }
 
 .modal-actions {
@@ -1537,7 +1742,7 @@ label {
 
 /* =========================================================
    MODALS
-   ========================================================= */
+========================================================= */
 
 .modal {
   position: fixed;
@@ -1564,26 +1769,20 @@ label {
 
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
-
-  animation: backdrop-in .16s ease-out;
-}
-
-@keyframes backdrop-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
 }
 
 .modal-card {
   position: relative;
+
   z-index: 1;
 
   width: min(480px, 100%);
-  max-height: min(760px, calc(100vh - 40px));
+
+  max-height:
+    min(
+      760px,
+      calc(100vh - 40px)
+    );
 
   overflow-y: auto;
 
@@ -1596,22 +1795,25 @@ label {
 
   box-shadow: var(--shadow-large);
 
-  animation: modal-in .18s ease-out;
-}
-
-.modal-card.large {
-  width: min(680px, 100%);
+  animation:
+    modal-in .18s ease-out;
 }
 
 @keyframes modal-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(.985);
+
+    transform:
+      translateY(8px)
+      scale(.985);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+
+    transform:
+      translateY(0)
+      scale(1);
   }
 }
 
@@ -1630,25 +1832,47 @@ label {
 
   font-size: 22px;
   line-height: 1.15;
+
   letter-spacing: -.4px;
+}
+
+.quick-category-card {
+  width: min(430px, 100%);
+}
+
+.quick-category-card form {
+  display: flex;
+  flex-direction: column;
+
+  gap: 18px;
 }
 
 
 /* =========================================================
    TOASTS
-   ========================================================= */
+========================================================= */
 
 #toast-container {
   position: fixed;
 
-  right: max(16px, env(safe-area-inset-right));
+  right:
+    max(
+      16px,
+      env(safe-area-inset-right)
+    );
+
   bottom:
     calc(
       var(--bottom-nav-height) +
       var(--safe-bottom) +
       16px
     );
-  left: max(16px, env(safe-area-inset-left));
+
+  left:
+    max(
+      16px,
+      env(safe-area-inset-left)
+    );
 
   z-index: 1000;
 
@@ -1678,7 +1902,17 @@ label {
 
   pointer-events: auto;
 
-  animation: toast-in .18s ease-out;
+  opacity: 0;
+  transform: translateY(7px);
+
+  transition:
+    opacity .18s ease,
+    transform .18s ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .toast.success {
@@ -1689,22 +1923,10 @@ label {
   background: var(--danger);
 }
 
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(7px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 
 /* =========================================================
    BOTTOM NAVIGATION
-   ========================================================= */
+========================================================= */
 
 .bottom-nav {
   position: fixed;
@@ -1726,11 +1948,18 @@ label {
 
   padding:
     5px
-    max(6px, env(safe-area-inset-right))
+    max(
+      6px,
+      env(safe-area-inset-right)
+    )
     var(--safe-bottom)
-    max(6px, env(safe-area-inset-left));
+    max(
+      6px,
+      env(safe-area-inset-left)
+    );
 
-  background: rgba(255, 255, 255, .95);
+  background:
+    rgba(255, 255, 255, .95);
 
   border-top: 1px solid var(--border);
 
@@ -1740,6 +1969,7 @@ label {
 
 .nav-button {
   min-width: 0;
+
   height: var(--bottom-nav-height);
 
   flex: 1;
@@ -1761,8 +1991,6 @@ label {
 
   font-size: 10px;
   font-weight: 600;
-
-  -webkit-tap-highlight-color: transparent;
 }
 
 .nav-button:hover {
@@ -1771,6 +1999,7 @@ label {
 
 .nav-button.active {
   color: var(--accent);
+
   background: var(--accent-soft);
 }
 
@@ -1788,7 +2017,7 @@ label {
 
 /* =========================================================
    DESKTOP
-   ========================================================= */
+========================================================= */
 
 @media (min-width: 700px) {
 
@@ -1801,7 +2030,11 @@ label {
 
     height: auto;
 
-    width: min(var(--content-width), calc(100% - 40px));
+    width:
+      min(
+        var(--content-width),
+        calc(100% - 40px)
+      );
 
     margin: 0 auto;
 
@@ -1832,26 +2065,33 @@ label {
   }
 
   .toast {
-    width: min(420px, calc(100vw - 48px));
+    width:
+      min(
+        420px,
+        calc(100vw - 48px)
+      );
   }
 
   .topbar {
-    padding-left: max(
-      24px,
-      calc((100vw - var(--content-width)) / 2)
-    );
+    padding-left:
+      max(
+        24px,
+        calc(
+          (100vw - var(--content-width))
+          / 2
+        )
+      );
 
-    padding-right: max(
-      24px,
-      calc((100vw - var(--content-width)) / 2)
-    );
+    padding-right:
+      max(
+        24px,
+        calc(
+          (100vw - var(--content-width))
+          / 2
+        )
+      );
   }
 }
-
-
-/* =========================================================
-   LARGE DESKTOP
-   ========================================================= */
 
 @media (min-width: 1000px) {
 
@@ -1871,7 +2111,7 @@ label {
 
 /* =========================================================
    MOBILE
-   ========================================================= */
+========================================================= */
 
 @media (max-width: 699px) {
 
@@ -1880,7 +2120,8 @@ label {
   }
 
   .content {
-    width: calc(100% - 24px);
+    width:
+      calc(100% - 24px);
 
     padding-top: 18px;
   }
@@ -1897,8 +2138,10 @@ label {
     font-size: 25px;
   }
 
-  .page-heading > .primary-button,
-  .page-heading > .secondary-button {
+  .page-heading >
+  .primary-button,
+  .page-heading >
+  .secondary-button {
     width: 100%;
   }
 
@@ -1911,7 +2154,8 @@ label {
   }
 
   .summary-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns:
+      1fr 1fr;
 
     gap: 8px;
 
@@ -1963,7 +2207,8 @@ label {
   .filter-row {
     display: grid;
 
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns:
+      1fr 1fr;
 
     gap: 10px;
   }
@@ -1990,16 +2235,6 @@ label {
     margin-top: -4px;
   }
 
-  .transaction-amount {
-    align-self: center;
-  }
-
-  .analytics-item {
-    grid-template-columns:
-      minmax(0, 1fr)
-      auto;
-  }
-
   .budgets-grid {
     grid-template-columns: 1fr;
   }
@@ -2008,41 +2243,50 @@ label {
     grid-template-columns: 1fr;
   }
 
-  .form-grid {
-    grid-template-columns: 1fr;
-
-    gap: 13px;
-  }
-
   .modal {
     align-items: flex-end;
 
     padding: 0;
   }
 
-  .modal-card,
-  .modal-card.large {
+  .modal-card {
     width: 100%;
-    max-height: calc(100vh - 16px);
+
+    max-height:
+      calc(100vh - 16px);
 
     padding:
       20px
-      max(18px, env(safe-area-inset-right))
-      calc(20px + var(--safe-bottom))
-      max(18px, env(safe-area-inset-left));
+      max(
+        18px,
+        env(safe-area-inset-right)
+      )
+      calc(
+        20px +
+        var(--safe-bottom)
+      )
+      max(
+        18px,
+        env(safe-area-inset-left)
+      );
 
-    border-radius: 22px 22px 0 0;
+    border-radius:
+      22px 22px 0 0;
 
-    animation: sheet-in .2s ease-out;
+    animation:
+      sheet-in .2s ease-out;
   }
 
   @keyframes sheet-in {
+
     from {
-      transform: translateY(100%);
+      transform:
+        translateY(100%);
     }
 
     to {
-      transform: translateY(0);
+      transform:
+        translateY(0);
     }
   }
 
@@ -2062,24 +2306,97 @@ label {
     width: 100%;
   }
 
-  .transaction-item {
-    grid-template-columns:
-      minmax(0, 1fr)
-      95px
-      36px;
+  .transaction-modal-card {
+    max-height:
+      calc(100vh - 8px);
+
+    padding:
+      18px
+      16px
+      calc(
+        18px +
+        var(--safe-bottom)
+      );
   }
 
-  .auth-card {
-    padding: 24px 20px;
+  .transaction-modal-card form {
+    gap: 15px;
+  }
 
-    border-radius: 20px;
+  .amount-input-wrap input {
+    height: 72px;
+
+    font-size: 34px;
+  }
+
+  .transaction-type {
+    min-height: 46px;
+  }
+
+  .transaction-category-chip {
+    min-height: 44px;
+
+    padding:
+      10px 15px;
+  }
+
+  .item-row {
+    grid-template-columns:
+      minmax(0, 1fr)
+      88px
+      34px;
+  }
+
+  .item-row .item-category {
+    grid-column: 1 / -1;
+  }
+
+  .transaction-modal-card
+  .modal-actions {
+    position: sticky;
+
+    bottom: 0;
+
+    margin:
+      4px -16px -18px;
+
+    padding:
+      12px 16px
+      calc(
+        12px +
+        var(--safe-bottom)
+      );
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255,255,255,0),
+        var(--surface) 20%
+      );
+  }
+
+  .category-tree-parent {
+    align-items: flex-start;
+  }
+
+  .category-tree-info {
+    flex-wrap: wrap;
+  }
+
+  .category-tree-actions {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .category-add-child {
+    min-height: 28px;
   }
 }
 
 
 /* =========================================================
    VERY SMALL PHONES
-   ========================================================= */
+========================================================= */
 
 @media (max-width: 380px) {
 
@@ -2092,7 +2409,8 @@ label {
   }
 
   .content {
-    width: calc(100% - 20px);
+    width:
+      calc(100% - 20px);
   }
 
   .summary-card {
@@ -2115,26 +2433,28 @@ label {
     font-size: 17px;
   }
 
-  .transaction-item {
+  .item-row {
     grid-template-columns:
       minmax(0, 1fr)
-      82px
+      78px
       34px;
   }
 }
 
 
 /* =========================================================
-   TOUCH DEVICES
-   ========================================================= */
+   TOUCH
+========================================================= */
 
-@media (hover: none) and (pointer: coarse) {
+@media (hover: none)
+and (pointer: coarse) {
 
   button,
   select,
   input,
   textarea {
-    -webkit-tap-highlight-color: transparent;
+    -webkit-tap-highlight-color:
+      transparent;
   }
 
   .primary-button,
@@ -2159,7 +2479,7 @@ label {
 
 /* =========================================================
    REDUCED MOTION
-   ========================================================= */
+========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
 
@@ -2168,301 +2488,13 @@ label {
   *::after {
     scroll-behavior: auto !important;
 
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
+    animation-duration:
+      .01ms !important;
 
-    transition-duration: .01ms !important;
+    animation-iteration-count:
+      1 !important;
+
+    transition-duration:
+      .01ms !important;
   }
-}
-
-
-
-
-/* =========================================================
-   MOBILE TRANSACTION FORM
-========================================================= */
-
-.transaction-modal-card {
-  width: min(520px, 100%);
-}
-
-
-.transaction-modal-card form {
-  display: flex;
-  flex-direction: column;
-  gap: 17px;
-}
-
-
-/* AMOUNT */
-
-.amount-field {
-  gap: 8px;
-}
-
-
-.amount-field > span {
-  color: var(--text-soft);
-}
-
-
-.amount-input-wrap {
-  position: relative;
-}
-
-
-.amount-input-wrap input {
-  height: 76px;
-
-  padding:
-    8px 54px 8px 18px;
-
-  border-radius: 17px;
-
-  font-size: 36px;
-  font-weight: 800;
-
-  letter-spacing: -1px;
-
-  text-align: left;
-}
-
-
-.amount-input-wrap > span {
-  position: absolute;
-
-  right: 18px;
-  top: 50%;
-
-  transform: translateY(-50%);
-
-  color: var(--muted);
-
-  font-size: 22px;
-  font-weight: 700;
-
-  pointer-events: none;
-}
-
-
-/* FIELD HEADING */
-
-.transaction-field-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  margin-bottom: 8px;
-
-  color: var(--text-soft);
-
-  font-size: 13px;
-  font-weight: 600;
-}
-
-
-.transaction-field-heading .link-button {
-  min-height: 28px;
-
-  padding: 2px 0;
-
-  font-size: 12px;
-}
-
-
-/* CATEGORY */
-
-.transaction-category-block {
-  width: 100%;
-}
-
-
-.transaction-category-hidden {
-  display: none;
-}
-
-
-.transaction-category-chips {
-  display: flex;
-
-  gap: 8px;
-
-  width: 100%;
-
-  overflow-x: auto;
-
-  padding:
-    2px 2px 7px;
-
-  scrollbar-width: none;
-}
-
-
-.transaction-category-chips::-webkit-scrollbar {
-  display: none;
-}
-
-
-.transaction-category-chip {
-  flex: 0 0 auto;
-
-  min-height: 42px;
-
-  padding:
-    9px 15px;
-
-  border: 1px solid var(--border);
-
-  border-radius: 12px;
-
-  background: var(--surface);
-
-  color: var(--text-soft);
-
-  font-size: 13px;
-  font-weight: 650;
-
-  white-space: nowrap;
-
-  transition:
-    background .15s ease,
-    color .15s ease,
-    border-color .15s ease,
-    transform .1s ease;
-}
-
-
-.transaction-category-chip:active {
-  transform: scale(.97);
-}
-
-
-.transaction-category-chip.active {
-  background: var(--accent);
-
-  border-color: var(--accent);
-
-  color: #fff;
-}
-
-
-/* ITEMS */
-
-.transaction-items-section {
-  margin-top: 2px;
-}
-
-
-.transaction-items-total {
-  margin-top: 8px;
-
-  color: var(--muted);
-
-  font-size: 12px;
-
-  text-align: right;
-}
-
-
-/* QUICK CATEGORY */
-
-.quick-category-card {
-  width: min(430px, 100%);
-}
-
-
-.quick-category-card form {
-  display: flex;
-  flex-direction: column;
-
-  gap: 18px;
-}
-
-
-/* MOBILE */
-
-@media (max-width: 699px) {
-
-  .transaction-modal-card {
-    max-height: calc(100vh - 8px);
-
-    padding:
-      18px 16px
-      calc(18px + var(--safe-bottom));
-  }
-
-
-  .transaction-modal-card .modal-header {
-    margin-bottom: 16px;
-  }
-
-
-  .transaction-modal-card form {
-    gap: 15px;
-  }
-
-
-  .amount-input-wrap input {
-    height: 72px;
-
-    font-size: 34px;
-  }
-
-
-  .transaction-type {
-    min-height: 46px;
-  }
-
-
-  .transaction-category-chip {
-    min-height: 44px;
-
-    padding:
-      10px 15px;
-  }
-
-
-  .transaction-modal-card .modal-actions {
-    position: sticky;
-
-    bottom: 0;
-
-    margin:
-      4px -16px -18px;
-
-    padding:
-      12px 16px
-      calc(12px + var(--safe-bottom));
-
-    background:
-      linear-gradient(
-        to bottom,
-        rgba(255,255,255,0),
-        var(--surface) 20%
-      );
-  }
-
-
-  .transaction-modal-card .modal-actions
-  .primary-button {
-
-    flex: 1;
-
-    min-height: 50px;
-  }
-
-
-  .transaction-modal-card .modal-actions
-  .secondary-button {
-
-    min-width: 92px;
-  }
-
-
-  .quick-category-card {
-    padding:
-      20px 16px
-      calc(20px + var(--safe-bottom));
-  }
-
 }
