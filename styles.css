@@ -2028,32 +2028,62 @@ label {
   .bottom-nav {
     position: static;
 
-    height: auto;
-
     width:
       min(
         var(--content-width),
         calc(100% - 40px)
       );
 
+    height: 58px;
+
     margin: 0 auto;
 
-    padding: 0;
+    padding: 5px;
 
-    background: transparent;
+    display: flex;
+    align-items: center;
 
-    border: 0;
+    background: var(--surface);
+
+    border: 1px solid var(--border);
+    border-radius: 15px;
+
+    box-shadow:
+      0 2px 10px rgba(35, 31, 25, .025);
 
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
 
   .nav-button {
-    display: none;
+    display: flex;
+
+    height: 46px;
+
+    flex: 1;
+
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    padding: 8px 14px;
+
+    border-radius: 10px;
+
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .nav-icon {
+    min-height: auto;
+
+    font-size: 17px;
   }
 
   .content {
-    padding-bottom: 40px;
+    padding-bottom: 32px;
   }
 
   #toast-container {
