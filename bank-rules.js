@@ -77,22 +77,28 @@ window.FinTrackerBankRules = (() => {
       "Развлечения"
     ],
 
-    [/зарплат|salary|заработ|аванс/i, "Зарплата"],
-
     [
-      /жкх|коммунал|электроэнерг|водоканал|газоснабж/i,
-      "Коммунальные услуги"
-    ],
-
-    [/мтс|мегафон|билайн|tele2|теле2/i, "Связь"]
+      /мтс|мегафон|билайн|tele2|теле2/i,
+      "Связь"
+    ]
   ];
 
 
   function clean(value) {
 
     return String(value ?? "")
+      .replace(/\u00a0/g, " ")
       .replace(/\s+/g, " ")
       .trim();
+
+  }
+
+
+  function normalizeSearchText(value) {
+
+    return clean(value)
+      .toLowerCase()
+      .replace(/ё/g, "е");
 
   }
 
@@ -103,23 +109,38 @@ window.FinTrackerBankRules = (() => {
       typeof value === "number" &&
       Number.isFinite(value)
     ) {
-      return Math.round(value * 100) / 100;
+
+      return Math.round(
+        value * 100
+      ) / 100;
+
     }
 
+
     let text = clean(value)
-      .replace(/\u00a0/g, " ")
-      .replace(/₽|RUB|руб\.?/gi, "")
+      .replace(
+        /₽|RUB|руб\.?/gi,
+        ""
+      )
       .replace(/\s/g, "");
+
 
     if (!text) {
       return 0;
     }
 
+
     const negative =
       /^-/.test(text) ||
       /^\(.*\)$/.test(text);
 
-    text = text.replace(/[()]/g, "");
+
+    text =
+      text.replace(
+        /[()]/g,
+        ""
+      );
+
 
     if (
       text.includes(",") &&
@@ -130,33 +151,46 @@ window.FinTrackerBankRules = (() => {
         text.lastIndexOf(",") >
         text.lastIndexOf(".")
       ) {
-        text = text
-          .replace(/\./g, "")
-          .replace(",", ".");
+
+        text =
+          text
+            .replace(/\./g, "")
+            .replace(",", ".");
+
       } else {
-        text = text.replace(/,/g, "");
+
+        text =
+          text.replace(/,/g, "");
+
       }
 
     } else {
 
-      text = text.replace(",", ".");
+      text =
+        text.replace(",", ".");
 
     }
 
-    const number = Number(text);
+
+    const number =
+      Number(text);
+
 
     if (!Number.isFinite(number)) {
       return 0;
     }
+
 
     const result =
       Math.round(
         Math.abs(number) * 100
       ) / 100;
 
+
     return negative
       ? -result
       : result;
+
   }
 
 
@@ -166,14 +200,20 @@ window.FinTrackerBankRules = (() => {
       return null;
     }
 
+
     if (
       value instanceof Date &&
-      !Number.isNaN(value.getTime())
+      !Number.isNaN(
+        value.getTime()
+      )
     ) {
+
       return value
         .toISOString()
         .slice(0, 10);
+
     }
+
 
     if (
       typeof value === "number" &&
@@ -181,9 +221,11 @@ window.FinTrackerBankRules = (() => {
     ) {
 
       const parsed =
-        window.XLSX.SSF.parse_date_code(
-          value
-        );
+        window.XLSX.SSF
+          .parse_date_code(
+            value
+          );
+
 
       if (parsed) {
 
@@ -194,14 +236,19 @@ window.FinTrackerBankRules = (() => {
         );
 
       }
+
     }
 
-    const text = clean(value);
+
+    const text =
+      clean(value);
+
 
     let match =
       text.match(
         /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/
       );
+
 
     if (match) {
 
@@ -213,10 +260,12 @@ window.FinTrackerBankRules = (() => {
 
     }
 
+
     match =
       text.match(
         /^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/
       );
+
 
     if (match) {
 
@@ -228,45 +277,66 @@ window.FinTrackerBankRules = (() => {
 
     }
 
-    const date = new Date(text);
 
-    if (Number.isNaN(date.getTime())) {
+    const date =
+      new Date(text);
+
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
       return null;
     }
+
 
     return date
       .toISOString()
       .slice(0, 10);
+
   }
 
 
-  function extractMcc(description) {
+  function extractMcc(
+    description
+  ) {
 
     const match =
-      clean(description).match(
-        /\bMCC\s*[:#-]?\s*(\d{4})\b/i
-      );
+      clean(description)
+        .match(
+          /\bMCC\s*[:#-]?\s*(\d{4})\b/i
+        );
+
 
     return match
       ? match[1]
       : null;
+
   }
 
 
-  function extractMerchant(description) {
+  function extractMerchant(
+    description
+  ) {
 
     const text =
       clean(description);
+
 
     const place =
       text.match(
         /место совершения операции\s*:\s*([^,\n]+)/i
       );
 
+
     if (place) {
 
       return clean(place[1])
-        .replace(/^RU\//i, "")
+        .replace(
+          /^RU\//i,
+          ""
+        )
         .replace(
           /^RUSSIAN FEDERATION\//i,
           ""
@@ -274,54 +344,165 @@ window.FinTrackerBankRules = (() => {
 
     }
 
+
     const beneficiary =
       text.match(
         /(?:в пользу|получатель|магазин|торговая точка)\s*[:\-]?\s*([^,;\n]+)/i
       );
 
+
     if (beneficiary) {
-      return clean(beneficiary[1]);
+      return clean(
+        beneficiary[1]
+      );
     }
 
+
     return null;
+
+  }
+
+
+  function extractOperationId(
+    row
+  ) {
+
+    const candidates = [
+
+      row.bankCode,
+
+      row.operationId,
+
+      row.externalId,
+
+      row.code
+
+    ];
+
+
+    for (
+      const candidate
+      of candidates
+    ) {
+
+      const value =
+        clean(candidate);
+
+
+      if (value) {
+        return value;
+      }
+
+    }
+
+
+    return null;
+
+  }
+
+
+  function isHold(row) {
+
+    const text =
+      normalizeSearchText(
+        `${row.description || ""} ${
+          row.status || ""
+        } ${
+          row.bankCategory || ""
+        } ${
+          row.bankCode || ""
+        }`
+      );
+
+
+    return (
+      /\bhold\b/.test(text) ||
+      /холд/.test(text) ||
+      /предавториз/.test(text) ||
+      /блокировк.*средств/.test(text)
+    );
+
+  }
+
+
+  function isTransfer(row) {
+
+    const text =
+      normalizeSearchText(
+        `${row.description || ""} ${
+          row.bankCategory || ""
+        } ${
+          row.status || ""
+        }`
+      );
+
+
+    if (
+      /внутрибанковск/.test(text) ||
+      /между счет/.test(text) ||
+      /межсчет/.test(text) ||
+      /между собственн/.test(text) ||
+      /между своими/.test(text) ||
+      /перевод между счет/.test(text)
+    ) {
+
+      return true;
+
+    }
+
+
+    /*
+     * СБП сама по себе не означает перевод
+     * между собственными счетами.
+     *
+     * Поэтому:
+     *
+     * "Перевод по СБП" ≠ автоматически transfer.
+     *
+     * Если это обычное поступление/отправление
+     * другому человеку, сохраняем как income/expense.
+     */
+
+    return false;
+
   }
 
 
   function detectType(row) {
 
-    const text =
-      clean(
-        `${row.description || ""} ${
-          row.bankCategory || ""
-        }`
-      ).toLowerCase();
-
     const amount =
       Number(row.amount) || 0;
 
-    if (
-      /внутрибанковск|между счет|межсчет|между собственн|между своими/i
-        .test(text)
-    ) {
-      return "transfer";
-    }
 
     if (
-      /зарплат|аванс/i.test(text) &&
+      isTransfer(row)
+    ) {
+
+      return "transfer";
+
+    }
+
+
+    if (
       amount > 0
     ) {
+
       return "income";
+
     }
 
-    if (amount > 0) {
-      return "income";
-    }
 
-    if (amount < 0) {
+    if (
+      amount < 0
+    ) {
+
       return "expense";
+
     }
+
 
     return "unknown";
+
   }
 
 
@@ -330,8 +511,34 @@ window.FinTrackerBankRules = (() => {
     const description =
       clean(row.description);
 
+
     const amount =
-      parseAmount(row.amount);
+      parseAmount(
+        row.amount
+      );
+
+
+    const hold =
+      isHold({
+        ...row,
+        description
+      });
+
+
+    const transfer =
+      isTransfer({
+        ...row,
+        description
+      });
+
+
+    const type =
+      detectType({
+        ...row,
+        amount,
+        description
+      });
+
 
     return {
 
@@ -348,32 +555,47 @@ window.FinTrackerBankRules = (() => {
       merchant:
         clean(
           row.merchant ||
-          extractMerchant(description)
+          extractMerchant(
+            description
+          )
         ) || null,
 
       mcc:
-        row.mcc ||
-        extractMcc(description),
+        clean(
+          row.mcc
+        ) ||
+        extractMcc(
+          description
+        ),
 
       bankCode:
-        clean(row.bankCode) || null,
+        extractOperationId(
+          row
+        ),
 
       bankCategory:
-        clean(row.bankCategory) || null,
+        clean(
+          row.bankCategory
+        ) || null,
 
       status:
-        clean(row.status) || null,
+        clean(
+          row.status
+        ) || null,
 
-      type:
-        detectType({
-          ...row,
-          amount,
-          description
-        }),
+      type,
+
+      isTransfer:
+        transfer,
+
+      isHold:
+        hold,
 
       source:
-        "bank_import"
+        "alfa_bank"
+
     };
+
   }
 
 
@@ -382,8 +604,18 @@ window.FinTrackerBankRules = (() => {
     userRules = []
   ) {
 
+    if (
+      operation.type ===
+      "transfer"
+    ) {
+
+      return null;
+
+    }
+
+
     const haystack =
-      clean(
+      normalizeSearchText(
         `${operation.merchant || ""} ${
           operation.description || ""
         } ${
@@ -392,7 +624,10 @@ window.FinTrackerBankRules = (() => {
       );
 
 
-    for (const rule of userRules) {
+    for (
+      const rule
+      of userRules
+    ) {
 
       if (
         !rule?.pattern ||
@@ -401,15 +636,20 @@ window.FinTrackerBankRules = (() => {
         continue;
       }
 
+
       try {
 
         if (
           new RegExp(
             rule.pattern,
             "i"
-          ).test(haystack)
+          ).test(
+            haystack
+          )
         ) {
+
           return rule.categoryName;
+
         }
 
       } catch (_) {}
@@ -422,8 +662,14 @@ window.FinTrackerBankRules = (() => {
       of MERCHANT_RULES
     ) {
 
-      if (pattern.test(haystack)) {
+      if (
+        pattern.test(
+          haystack
+        )
+      ) {
+
         return category;
+
       }
 
     }
@@ -431,51 +677,98 @@ window.FinTrackerBankRules = (() => {
 
     if (
       operation.mcc &&
-      MCC_RULES[operation.mcc]
+      MCC_RULES[
+        operation.mcc
+      ]
     ) {
+
       return MCC_RULES[
         operation.mcc
       ];
+
     }
 
 
     const bank =
-      clean(
+      normalizeSearchText(
         operation.bankCategory
-      ).toLowerCase();
+      );
+
 
     if (
-      /продукт|магазин|супермаркет/i
-        .test(bank)
+      /зарплат|аванс|заработ/.test(
+        bank
+      ) &&
+      operation.type ===
+        "income"
     ) {
-      return "Продукты";
-    }
 
-    if (
-      /игр|steam/i.test(bank)
-    ) {
-      return "Игры";
-    }
-
-    if (
-      /зарплат|доход|заработ/i.test(bank) &&
-      operation.type === "income"
-    ) {
       return "Зарплата";
+
     }
+
+
+    if (
+      /продукт|магазин|супермаркет/.test(
+        bank
+      )
+    ) {
+
+      return "Продукты";
+
+    }
+
+
+    if (
+      /кафе|ресторан|общепит/.test(
+        bank
+      )
+    ) {
+
+      return "Рестораны";
+
+    }
+
+
+    if (
+      /такси|транспорт/.test(
+        bank
+      )
+    ) {
+
+      return "Транспорт";
+
+    }
+
+
+    if (
+      /игр|steam/.test(
+        bank
+      )
+    ) {
+
+      return "Игры";
+
+    }
+
 
     return null;
+
   }
 
 
-  function makeFingerprint(operation) {
+  function makeFingerprint(
+    operation
+  ) {
 
     return [
 
       operation.date || "",
 
       Math.abs(
-        Number(operation.amount) || 0
+        Number(
+          operation.amount
+        ) || 0
       ).toFixed(2),
 
       operation.type || "",
@@ -489,19 +782,34 @@ window.FinTrackerBankRules = (() => {
       ).toLowerCase()
 
     ].join("|");
+
   }
 
 
   return {
 
     clean,
+
     parseAmount,
+
     parseDate,
+
     extractMcc,
+
     extractMerchant,
+
+    extractOperationId,
+
+    isHold,
+
+    isTransfer,
+
     detectType,
+
     normalizeOperation,
+
     findRuleCategory,
+
     makeFingerprint
 
   };

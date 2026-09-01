@@ -11,6 +11,7 @@ window.FinTrackerExcelParser = (() => {
     date: [
       "дата операции",
       "дата",
+      "дата операции по счету",
       "operation date",
       "transaction date"
     ],
@@ -18,6 +19,7 @@ window.FinTrackerExcelParser = (() => {
     postingDate: [
       "дата проводки",
       "дата обработки",
+      "дата списания",
       "posting date",
       "value date"
     ],
@@ -25,6 +27,7 @@ window.FinTrackerExcelParser = (() => {
     amount: [
       "сумма",
       "сумма операции",
+      "сумма операции в валюте счета",
       "amount",
       "transaction amount"
     ],
@@ -34,6 +37,7 @@ window.FinTrackerExcelParser = (() => {
       "назначение платежа",
       "назначение",
       "описание операции",
+      "назначение операции",
       "description",
       "details"
     ],
@@ -42,6 +46,7 @@ window.FinTrackerExcelParser = (() => {
       "категория",
       "категория операции",
       "тип операции",
+      "категория транзакции",
       "category",
       "operation category"
     ],
@@ -50,24 +55,48 @@ window.FinTrackerExcelParser = (() => {
       "код операции",
       "код",
       "номер операции",
+      "номер транзакции",
+      "идентификатор операции",
       "operation code",
-      "transaction id"
+      "transaction id",
+      "external id"
     ],
 
     status: [
       "статус",
       "состояние",
+      "статус операции",
       "status"
+    ],
+
+    merchant: [
+      "магазин",
+      "торговая точка",
+      "получатель",
+      "отправитель",
+      "merchant",
+      "merchant name"
+    ],
+
+    mcc: [
+      "mcc",
+      "код mcc",
+      "mcc code"
     ]
 
   };
 
 
-  function normalizeHeader(value) {
+  function normalizeHeader(
+    value
+  ) {
 
     return R.clean(value)
       .toLowerCase()
-      .replace(/ё/g, "е")
+      .replace(
+        /ё/g,
+        "е"
+      )
       .replace(
         /[_\-\/]+/g,
         " "
@@ -91,28 +120,42 @@ window.FinTrackerExcelParser = (() => {
         normalizeHeader
       );
 
+
     for (
-      const alias of aliases
+      const alias
+      of aliases
     ) {
 
       const index =
         normalized.indexOf(
-          normalizeHeader(alias)
+          normalizeHeader(
+            alias
+          )
         );
 
-      if (index !== -1) {
+
+      if (
+        index !== -1
+      ) {
+
         return headers[index];
+
       }
 
     }
 
+
     return null;
+
   }
 
 
-  function detectColumns(headers) {
+  function detectColumns(
+    headers
+  ) {
 
     const result = {};
+
 
     for (
       const [key, aliases]
@@ -129,30 +172,47 @@ window.FinTrackerExcelParser = (() => {
 
     }
 
+
     return result;
+
   }
 
 
-  function convertRows(rows) {
+  function convertRows(
+    rows
+  ) {
 
-    if (!rows.length) {
+    if (
+      !rows.length
+    ) {
+
       throw new Error(
         "В Excel не найдено строк."
       );
+
     }
 
 
     const headers =
-      Object.keys(rows[0]);
+      Object.keys(
+        rows[0]
+      );
+
 
     const columns =
-      detectColumns(headers);
+      detectColumns(
+        headers
+      );
 
 
-    if (!columns.amount) {
+    if (
+      !columns.amount
+    ) {
+
       throw new Error(
         "Не удалось определить колонку «Сумма»."
       );
+
     }
 
 
@@ -160,9 +220,11 @@ window.FinTrackerExcelParser = (() => {
       !columns.date &&
       !columns.postingDate
     ) {
+
       throw new Error(
         "Не удалось определить дату операции."
       );
+
     }
 
 
@@ -170,23 +232,34 @@ window.FinTrackerExcelParser = (() => {
 
 
     rows.forEach(
-      (raw, index) => {
+      (
+        raw,
+        index
+      ) => {
 
         const operation =
           R.normalizeOperation({
 
             date:
               columns.date
-                ? raw[columns.date]
-                : raw[columns.postingDate],
+                ? raw[
+                    columns.date
+                  ]
+                : raw[
+                    columns.postingDate
+                  ],
 
             postingDate:
               columns.postingDate
-                ? raw[columns.postingDate]
+                ? raw[
+                    columns.postingDate
+                  ]
                 : null,
 
             amount:
-              raw[columns.amount],
+              raw[
+                columns.amount
+              ],
 
             description:
               columns.description
@@ -214,6 +287,20 @@ window.FinTrackerExcelParser = (() => {
                 ? raw[
                     columns.status
                   ]
+                : "",
+
+            merchant:
+              columns.merchant
+                ? raw[
+                    columns.merchant
+                  ]
+                : "",
+
+            mcc:
+              columns.mcc
+                ? raw[
+                    columns.mcc
+                  ]
                 : ""
 
           });
@@ -222,17 +309,26 @@ window.FinTrackerExcelParser = (() => {
         operation.rowNumber =
           index + 2;
 
+
         operation.raw =
           raw;
 
+
+        /*
+         * Нулевые строки Excel,
+         * заголовки и прочий мусор
+         * отбрасываем.
+         */
 
         if (
           operation.amount !== 0 &&
           operation.date
         ) {
+
           operations.push(
             operation
           );
+
         }
 
       }
@@ -252,9 +348,13 @@ window.FinTrackerExcelParser = (() => {
   }
 
 
-  async function readFile(file) {
+  async function readFile(
+    file
+  ) {
 
-    if (!window.XLSX) {
+    if (
+      !window.XLSX
+    ) {
 
       throw new Error(
         "Библиотека XLSX не загружена."
@@ -280,9 +380,11 @@ window.FinTrackerExcelParser = (() => {
     if (
       !workbook.SheetNames.length
     ) {
+
       throw new Error(
         "В Excel нет листов."
       );
+
     }
 
 
@@ -304,7 +406,9 @@ window.FinTrackerExcelParser = (() => {
           );
 
 
-      if (rows.length) {
+      if (
+        rows.length
+      ) {
 
         return {
 
@@ -316,7 +420,9 @@ window.FinTrackerExcelParser = (() => {
           rowCount:
             rows.length,
 
-          ...convertRows(rows)
+          ...convertRows(
+            rows
+          )
 
         };
 

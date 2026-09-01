@@ -5,14 +5,24 @@ window.FinTrackerBankImport = (() => {
   const R =
     window.FinTrackerBankRules;
 
+
   const RULES_KEY =
     "fintracker.bankImport.rules.v1";
 
-  let supabaseClient = null;
+
+  const IMPORT_SOURCE =
+    "alfa_bank";
+
+
+  let supabaseClient =
+    null;
+
 
   let categories = [];
 
-  let existingTransactions = [];
+  let existingTransactions =
+    [];
+
 
   let prepared = [];
 
@@ -26,9 +36,14 @@ window.FinTrackerBankImport = (() => {
 
   function getClient() {
 
-    if (supabaseClient) {
+    if (
+      supabaseClient
+    ) {
+
       return supabaseClient;
+
     }
+
 
     supabaseClient =
       window.supabase.createClient(
@@ -41,7 +56,9 @@ window.FinTrackerBankImport = (() => {
 
       );
 
+
     return supabaseClient;
+
   }
 
 
@@ -69,9 +86,14 @@ window.FinTrackerBankImport = (() => {
     type
   ) {
 
-    if (!name) {
+    if (
+      !name
+    ) {
+
       return null;
+
     }
+
 
     const normalized =
       R.clean(name)
@@ -82,9 +104,11 @@ window.FinTrackerBankImport = (() => {
       categories.find(
         category =>
 
-          category.type === type &&
+          category.type ===
+            type &&
 
-          category.parent_id === null &&
+          category.parent_id ===
+            null &&
 
           R.clean(
             category.name
@@ -100,6 +124,62 @@ window.FinTrackerBankImport = (() => {
     operation
   ) {
 
+    /*
+     * Переводы не требуют
+     * категории.
+     */
+
+    if (
+      operation.isTransfer ||
+      operation.type ===
+        "transfer"
+    ) {
+
+      return {
+
+        ...operation,
+
+        categoryId:
+          null,
+
+        categoryName:
+          "Перевод",
+
+        autoCategory:
+          false
+
+      };
+
+    }
+
+
+    /*
+     * HOLD не импортируем
+     * автоматически.
+     */
+
+    if (
+      operation.isHold
+    ) {
+
+      return {
+
+        ...operation,
+
+        categoryId:
+          null,
+
+        categoryName:
+          "HOLD — проверить",
+
+        autoCategory:
+          false
+
+      };
+
+    }
+
+
     const categoryName =
       R.findRuleCategory(
         operation,
@@ -110,7 +190,9 @@ window.FinTrackerBankImport = (() => {
     let category =
       findCategory(
         categoryName,
-        operation.type === "income"
+
+        operation.type ===
+          "income"
           ? "income"
           : "expense"
       );
@@ -118,7 +200,8 @@ window.FinTrackerBankImport = (() => {
 
     if (
       !category &&
-      operation.type === "expense"
+      operation.type ===
+        "expense"
     ) {
 
       category =
@@ -135,7 +218,8 @@ window.FinTrackerBankImport = (() => {
       ...operation,
 
       categoryId:
-        category?.id || null,
+        category?.id ||
+        null,
 
       categoryName:
         category?.name ||
@@ -159,8 +243,11 @@ window.FinTrackerBankImport = (() => {
 
 
     const [
+
       categoriesResult,
+
       transactionsResult
+
     ] =
       await Promise.all([
 
@@ -172,7 +259,18 @@ window.FinTrackerBankImport = (() => {
         client
           .from("transactions")
           .select(
-            "id,date,type,amount,merchant,comment"
+            `
+              id,
+              date,
+              type,
+              amount,
+              merchant,
+              comment,
+              import_source,
+              import_external_id,
+              import_fingerprint,
+              is_transfer
+            `
           )
 
       ]);
@@ -181,22 +279,29 @@ window.FinTrackerBankImport = (() => {
     if (
       categoriesResult.error
     ) {
+
       throw categoriesResult.error;
+
     }
 
 
     if (
       transactionsResult.error
     ) {
+
       throw transactionsResult.error;
+
     }
 
 
     categories =
-      categoriesResult.data || [];
+      categoriesResult.data ||
+      [];
+
 
     existingTransactions =
-      transactionsResult.data || [];
+      transactionsResult.data ||
+      [];
 
   }
 
@@ -222,7 +327,8 @@ window.FinTrackerBankImport = (() => {
         transaction.merchant,
 
       description:
-        transaction.comment || ""
+        transaction.comment ||
+        ""
 
     });
 
@@ -233,11 +339,39 @@ window.FinTrackerBankImport = (() => {
     operations
   ) {
 
-    const duplicateSet =
+    const externalIds =
       new Set(
-        existingTransactions.map(
-          existingFingerprint
-        )
+
+        existingTransactions
+
+          .filter(
+            transaction =>
+
+              transaction
+                .import_source ===
+                IMPORT_SOURCE &&
+
+              transaction
+                .import_external_id
+          )
+
+          .map(
+            transaction =>
+              transaction
+                .import_external_id
+          )
+
+      );
+
+
+    const fingerprintSet =
+      new Set(
+
+        existingTransactions
+          .map(
+            existingFingerprint
+          )
+
       );
 
 
@@ -257,9 +391,78 @@ window.FinTrackerBankImport = (() => {
             );
 
 
-          const duplicate =
-            duplicateSet.has(
+          const externalId =
+            R.extractOperationId(
+              item
+            );
+
+
+          /*
+           * Сначала проверяем
+           * настоящий ID банка.
+           */
+
+          const duplicateById =
+            Boolean(
+              externalId &&
+              externalIds.has(
+                externalId
+              )
+            );
+
+
+          /*
+           * Если банковского ID нет,
+           * используем fingerprint.
+           */
+
+          const duplicateByFingerprint =
+            !externalId &&
+            fingerprintSet.has(
               fingerprint
+            );
+
+
+          const duplicate =
+            duplicateById ||
+            duplicateByFingerprint;
+
+
+          const blocked =
+            Boolean(
+              item.isHold
+            );
+
+
+          const transfer =
+            Boolean(
+              item.isTransfer ||
+              item.type ===
+                "transfer"
+            );
+
+
+          const valid =
+            Boolean(
+
+              item.date &&
+
+              Number.isFinite(
+                Number(
+                  item.amount
+                )
+              ) &&
+
+              item.type !==
+                "unknown" &&
+
+              !blocked &&
+
+              (
+                transfer ||
+                item.categoryId
+              )
+
             );
 
 
@@ -267,33 +470,31 @@ window.FinTrackerBankImport = (() => {
 
             ...item,
 
+            importSource:
+              IMPORT_SOURCE,
+
+            externalId,
+
             fingerprint,
 
             duplicate,
 
+            duplicateReason:
+              duplicateById
+                ? "Код операции уже импортирован"
+                : duplicateByFingerprint
+                  ? "Похожа на существующую операцию"
+                  : null,
+
+            blocked,
+
+            transfer,
+
             selected:
-              !duplicate,
+              !duplicate &&
+              !blocked,
 
-            valid:
-              Boolean(
-
-                item.date &&
-
-                Number.isFinite(
-                  Number(
-                    item.amount
-                  )
-                ) &&
-
-                item.type !==
-                  "unknown" &&
-
-                item.type !==
-                  "transfer" &&
-
-                item.categoryId
-
-              )
+            valid
 
           };
 
@@ -313,30 +514,40 @@ window.FinTrackerBankImport = (() => {
     return {
 
       type:
-        item.type,
+        item.transfer
+          ? "expense"
+          : item.type,
 
       amount:
         Math.abs(
-          Number(item.amount)
+          Number(
+            item.amount
+          )
         ),
 
       date:
         item.date,
 
       merchant:
-        item.type === "expense"
+        item.type ===
+        "expense"
+
           ? (
               item.merchant ||
               null
             )
+
           : null,
 
       income_source:
-        item.type === "income"
+        item.type ===
+        "income"
+
           ? (
               item.merchant ||
               null
             )
+
           : null,
 
       comment:
@@ -344,7 +555,24 @@ window.FinTrackerBankImport = (() => {
         null,
 
       category_id:
-        item.categoryId
+        item.transfer
+          ? null
+          : item.categoryId,
+
+      import_source:
+        item.importSource,
+
+      import_external_id:
+        item.externalId,
+
+      import_fingerprint:
+        item.fingerprint,
+
+      imported_at:
+        new Date().toISOString(),
+
+      is_transfer:
+        item.transfer
 
     };
 
@@ -361,11 +589,15 @@ window.FinTrackerBankImport = (() => {
 
           !item.duplicate &&
 
+          !item.blocked &&
+
           item.valid
       );
 
 
-    if (!selected.length) {
+    if (
+      !selected.length
+    ) {
 
       throw new Error(
         "Нет операций для импорта."
@@ -388,35 +620,69 @@ window.FinTrackerBankImport = (() => {
       100;
 
 
+    let imported =
+      0;
+
+
     for (
       let i = 0;
-      i < payloads.length;
-      i += CHUNK_SIZE
+
+      i <
+        payloads.length;
+
+      i +=
+        CHUNK_SIZE
     ) {
 
       const chunk =
         payloads.slice(
           i,
-          i + CHUNK_SIZE
+          i +
+            CHUNK_SIZE
         );
 
+
+      /*
+       * Важнейшая часть.
+       *
+       * Если операция уже есть,
+       * Supabase не создаст вторую.
+       */
 
       const {
         error
       } =
         await client
-          .from("transactions")
-          .insert(chunk);
+          .from(
+            "transactions"
+          )
+          .upsert(
+            chunk,
+            {
+              onConflict:
+                "user_id,import_source,import_external_id",
+              ignoreDuplicates:
+                true
+            }
+          );
 
 
-      if (error) {
+      if (
+        error
+      ) {
+
         throw error;
+
       }
+
+
+      imported +=
+        chunk.length;
 
     }
 
 
-    return selected.length;
+    return imported;
 
   }
 
@@ -428,22 +694,27 @@ window.FinTrackerBankImport = (() => {
     return String(
       value ?? ""
     )
+
       .replace(
         /&/g,
         "&amp;"
       )
+
       .replace(
         /</g,
         "&lt;"
       )
+
       .replace(
         />/g,
         "&gt;"
       )
+
       .replace(
         /"/g,
         "&quot;"
       )
+
       .replace(
         /'/g,
         "&#039;"
@@ -457,16 +728,25 @@ window.FinTrackerBankImport = (() => {
   ) {
 
     return (
+
       new Intl.NumberFormat(
         "ru-RU",
         {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
+          minimumFractionDigits:
+            2,
+
+          maximumFractionDigits:
+            2
         }
       ).format(
-        Number(value) || 0
-      ) +
+        Number(value) ||
+        0
+      )
+
+      +
+
       " ₽"
+
     );
 
   }
@@ -477,8 +757,11 @@ window.FinTrackerBankImport = (() => {
   ) {
 
     const type =
-      item.type === "income"
+      item.type ===
+        "income"
+
         ? "income"
+
         : "expense";
 
 
@@ -495,7 +778,10 @@ window.FinTrackerBankImport = (() => {
       )
 
       .sort(
-        (a, b) =>
+        (
+          a,
+          b
+        ) =>
           a.name.localeCompare(
             b.name,
             "ru"
@@ -509,6 +795,7 @@ window.FinTrackerBankImport = (() => {
             value="${escapeHtml(
               category.id
             )}"
+
             ${
               category.id ===
               item.categoryId
@@ -516,9 +803,11 @@ window.FinTrackerBankImport = (() => {
                 : ""
             }
           >
+
             ${escapeHtml(
               category.name
             )}
+
           </option>
 
         `
@@ -532,11 +821,17 @@ window.FinTrackerBankImport = (() => {
   function renderPreview() {
 
     const content =
-      $("#bank-import-content");
+      $(
+        "#bank-import-content"
+      );
 
 
-    if (!content) {
+    if (
+      !content
+    ) {
+
       return;
+
     }
 
 
@@ -547,21 +842,43 @@ window.FinTrackerBankImport = (() => {
       ).length;
 
 
+    const holds =
+      prepared.filter(
+        item =>
+          item.blocked
+      ).length;
+
+
+    const transfers =
+      prepared.filter(
+        item =>
+          item.transfer
+      ).length;
+
+
     const ready =
       prepared.filter(
         item =>
 
           item.selected &&
+
           item.valid &&
-          !item.duplicate
+
+          !item.duplicate &&
+
+          !item.blocked
       ).length;
 
 
     const invalid =
       prepared.filter(
         item =>
+
           !item.valid &&
-          !item.duplicate
+
+          !item.duplicate &&
+
+          !item.blocked
       ).length;
 
 
@@ -593,6 +910,20 @@ window.FinTrackerBankImport = (() => {
         </div>
 
         <div>
+          HOLD
+          <strong>
+            ${holds}
+          </strong>
+        </div>
+
+        <div>
+          Переводов
+          <strong>
+            ${transfers}
+          </strong>
+        </div>
+
+        <div>
           Проверить
           <strong>
             ${invalid}
@@ -613,13 +944,33 @@ window.FinTrackerBankImport = (() => {
           <thead>
 
             <tr>
+
               <th></th>
-              <th>Дата</th>
-              <th>Описание</th>
-              <th>Сумма</th>
-              <th>Тип</th>
-              <th>Категория</th>
-              <th></th>
+
+              <th>
+                Дата
+              </th>
+
+              <th>
+                Описание
+              </th>
+
+              <th>
+                Сумма
+              </th>
+
+              <th>
+                Тип
+              </th>
+
+              <th>
+                Категория
+              </th>
+
+              <th>
+                Статус
+              </th>
+
             </tr>
 
           </thead>
@@ -628,7 +979,10 @@ window.FinTrackerBankImport = (() => {
           <tbody>
 
             ${prepared.map(
-              (item, index) => `
+              (
+                item,
+                index
+              ) => `
 
                 <tr>
 
@@ -636,14 +990,18 @@ window.FinTrackerBankImport = (() => {
 
                     <input
                       type="checkbox"
+
                       data-import-index="${index}"
+
                       ${
                         item.selected
                           ? "checked"
                           : ""
                       }
+
                       ${
                         item.duplicate ||
+                        item.blocked ||
                         !item.valid
                           ? "disabled"
                           : ""
@@ -654,9 +1012,11 @@ window.FinTrackerBankImport = (() => {
 
 
                   <td>
+
                     ${escapeHtml(
                       item.date
                     )}
+
                   </td>
 
 
@@ -665,34 +1025,44 @@ window.FinTrackerBankImport = (() => {
                       item.description
                     )}"
                   >
+
                     ${escapeHtml(
                       item.merchant ||
                       item.description ||
                       "—"
                     )}
+
                   </td>
 
 
                   <td>
+
                     ${formatMoney(
                       item.amount
                     )}
+
                   </td>
 
 
                   <td>
 
                     ${
-                      item.type ===
-                      "income"
-                        ? "Доход"
+                      item.transfer
+
+                        ? "Перевод"
+
                         : item.type ===
-                          "expense"
-                          ? "Расход"
+                          "income"
+
+                          ? "Доход"
+
                           : item.type ===
-                            "transfer"
-                            ? "Перевод"
+                            "expense"
+
+                            ? "Расход"
+
                             : "?"
+
                     }
 
                   </td>
@@ -701,31 +1071,31 @@ window.FinTrackerBankImport = (() => {
                   <td>
 
                     ${
-                      item.valid
+                      item.transfer
 
-                        ? `
+                        ? "Не требуется"
 
-                          <select
-                            data-import-category="${index}"
-                          >
+                        : item.blocked
 
-                            ${categoryOptions(
-                              item
-                            )}
+                          ? "Проверить HOLD"
 
-                          </select>
+                          : item.valid
 
-                        `
+                            ? `
 
-                        : `
+                              <select
+                                data-import-category="${index}"
+                              >
 
-                          ${
-                            item.duplicate
-                              ? "Дубликат"
-                              : "Нужно проверить"
-                          }
+                                ${categoryOptions(
+                                  item
+                                )}
 
-                        `
+                              </select>
+
+                            `
+
+                            : "Нужно проверить"
                     }
 
                   </td>
@@ -734,9 +1104,26 @@ window.FinTrackerBankImport = (() => {
                   <td>
 
                     ${
-                      item.autoCategory
-                        ? "Авто"
-                        : "Ручн."
+                      item.duplicate
+
+                        ? escapeHtml(
+                            item.duplicateReason ||
+                            "Дубликат"
+                          )
+
+                        : item.blocked
+
+                          ? "HOLD — пропущено"
+
+                          : item.transfer
+
+                            ? "Перевод"
+
+                            : item.autoCategory
+
+                              ? "Авто"
+
+                              : "Ручн."
                     }
 
                   </td>
@@ -775,6 +1162,7 @@ window.FinTrackerBankImport = (() => {
               ].selected =
                 event.target.checked;
 
+
               updateStats();
 
             }
@@ -804,22 +1192,31 @@ window.FinTrackerBankImport = (() => {
 
 
               const item =
-                prepared[index];
+                prepared[
+                  index
+                ];
 
 
               item.categoryId =
-                event.target.value ||
+                event.target
+                  .value ||
                 null;
 
 
               item.valid =
                 Boolean(
+
                   item.date &&
+
                   item.categoryId &&
+
                   item.type !==
                     "unknown" &&
-                  item.type !==
-                    "transfer"
+
+                  !item.transfer &&
+
+                  !item.blocked
+
                 );
 
 
@@ -844,8 +1241,12 @@ window.FinTrackerBankImport = (() => {
         item =>
 
           item.selected &&
+
           item.valid &&
-          !item.duplicate
+
+          !item.duplicate &&
+
+          !item.blocked
       ).length;
 
 
@@ -856,11 +1257,29 @@ window.FinTrackerBankImport = (() => {
       ).length;
 
 
+    const holds =
+      prepared.filter(
+        item =>
+          item.blocked
+      ).length;
+
+
+    const transfers =
+      prepared.filter(
+        item =>
+          item.transfer
+      ).length;
+
+
     const invalid =
       prepared.filter(
         item =>
+
           !item.valid &&
-          !item.duplicate
+
+          !item.duplicate &&
+
+          !item.blocked
       ).length;
 
 
@@ -870,7 +1289,9 @@ window.FinTrackerBankImport = (() => {
       );
 
 
-    if (stats.length >= 4) {
+    if (
+      stats.length >= 6
+    ) {
 
       stats[0].textContent =
         prepared.length;
@@ -882,16 +1303,26 @@ window.FinTrackerBankImport = (() => {
         duplicates;
 
       stats[3].textContent =
+        holds;
+
+      stats[4].textContent =
+        transfers;
+
+      stats[5].textContent =
         invalid;
 
     }
 
 
     const submit =
-      $("#bank-import-submit");
+      $(
+        "#bank-import-submit"
+      );
 
 
-    if (submit) {
+    if (
+      submit
+    ) {
 
       submit.textContent =
         `Импортировать ${ready}`;
@@ -911,11 +1342,16 @@ window.FinTrackerBankImport = (() => {
   ) {
 
     const file =
-      event.target.files?.[0];
+      event.target
+        .files?.[0];
 
 
-    if (!file) {
+    if (
+      !file
+    ) {
+
       return;
+
     }
 
 
@@ -927,7 +1363,9 @@ window.FinTrackerBankImport = (() => {
       const parsed =
         await window
           .FinTrackerExcelParser
-          .readFile(file);
+          .readFile(
+            file
+          );
 
 
       prepare(
@@ -935,13 +1373,17 @@ window.FinTrackerBankImport = (() => {
       );
 
 
-      $("#bank-import-start")
+      $(
+        "#bank-import-start"
+      )
         ?.classList.add(
           "hidden"
         );
 
 
-      $("#bank-import-content")
+      $(
+        "#bank-import-content"
+      )
         ?.classList.remove(
           "hidden"
         );
@@ -950,28 +1392,41 @@ window.FinTrackerBankImport = (() => {
       renderPreview();
 
 
-    } catch (error) {
+    } catch (
+      error
+    ) {
 
-      console.error(error);
+      console.error(
+        error
+      );
 
 
       const content =
-        $("#bank-import-content");
+        $(
+          "#bank-import-content"
+        );
 
 
-      if (content) {
+      if (
+        content
+      ) {
 
         content.classList.remove(
           "hidden"
         );
 
+
         content.innerHTML = `
+
           <p>
+
             ${escapeHtml(
               error.message ||
               "Не удалось прочитать файл."
             )}
+
           </p>
+
         `;
 
       }
@@ -984,15 +1439,23 @@ window.FinTrackerBankImport = (() => {
   async function handleImport() {
 
     const button =
-      $("#bank-import-submit");
+      $(
+        "#bank-import-submit"
+      );
 
 
-    if (!button) {
+    if (
+      !button
+    ) {
+
       return;
+
     }
 
 
-    button.disabled = true;
+    button.disabled =
+      true;
+
 
     button.textContent =
       "Импортируем...";
@@ -1004,7 +1467,9 @@ window.FinTrackerBankImport = (() => {
         await importSelected();
 
 
-      $("#bank-import-modal")
+      $(
+        "#bank-import-modal"
+      )
         ?.classList.add(
           "hidden"
         );
@@ -1018,9 +1483,13 @@ window.FinTrackerBankImport = (() => {
       location.reload();
 
 
-    } catch (error) {
+    } catch (
+      error
+    ) {
 
-      console.error(error);
+      console.error(
+        error
+      );
 
 
       alert(
@@ -1032,6 +1501,7 @@ window.FinTrackerBankImport = (() => {
       button.disabled =
         false;
 
+
       updateStats();
 
     }
@@ -1042,9 +1512,13 @@ window.FinTrackerBankImport = (() => {
   function injectStyles() {
 
     if (
-      $("#bank-import-styles")
+      $(
+        "#bank-import-styles"
+      )
     ) {
+
       return;
+
     }
 
 
@@ -1068,8 +1542,11 @@ window.FinTrackerBankImport = (() => {
         display: grid;
         grid-template-columns:
           repeat(
-            4,
-            minmax(0, 1fr)
+            auto-fit,
+            minmax(
+              120px,
+              1fr
+            )
           );
         gap: 10px;
         margin: 16px 0;
@@ -1100,7 +1577,7 @@ window.FinTrackerBankImport = (() => {
         width: 100%;
         border-collapse:
           collapse;
-        min-width: 780px;
+        min-width: 900px;
       }
 
       .bank-import-table th,
@@ -1122,14 +1599,6 @@ window.FinTrackerBankImport = (() => {
 
       @media (max-width: 700px) {
 
-        .bank-import-summary {
-          grid-template-columns:
-            repeat(
-              2,
-              minmax(0, 1fr)
-            );
-        }
-
         .bank-import-button {
           margin-left: 0;
           margin-top: 8px;
@@ -1150,9 +1619,13 @@ window.FinTrackerBankImport = (() => {
   function createUI() {
 
     if (
-      $("#bank-import-modal")
+      $(
+        "#bank-import-modal"
+      )
     ) {
+
       return;
+
     }
 
 
@@ -1168,18 +1641,23 @@ window.FinTrackerBankImport = (() => {
     button.id =
       "bank-import-button";
 
+
     button.className =
       "secondary-button bank-import-button";
 
+
     button.type =
       "button";
+
 
     button.textContent =
       "Импорт выписки";
 
 
     const addButton =
-      $("#transactions-add");
+      $(
+        "#transactions-add"
+      );
 
 
     if (
@@ -1187,7 +1665,9 @@ window.FinTrackerBankImport = (() => {
     ) {
 
       addButton.parentElement
-        .appendChild(button);
+        .appendChild(
+          button
+        );
 
     }
 
@@ -1196,7 +1676,9 @@ window.FinTrackerBankImport = (() => {
       "click",
       () => {
 
-        $("#bank-import-modal")
+        $(
+          "#bank-import-modal"
+        )
           ?.classList.remove(
             "hidden"
           );
@@ -1213,6 +1695,7 @@ window.FinTrackerBankImport = (() => {
 
     modal.id =
       "bank-import-modal";
+
 
     modal.className =
       "modal hidden";
@@ -1271,6 +1754,7 @@ window.FinTrackerBankImport = (() => {
             в браузере.
           </p>
 
+
           <input
             id="bank-import-file"
             type="file"
@@ -1324,9 +1808,9 @@ window.FinTrackerBankImport = (() => {
         "[data-bank-import-close]"
       )
       .forEach(
-        button => {
+        closeButton => {
 
-          button.addEventListener(
+          closeButton.addEventListener(
             "click",
             () => {
 
@@ -1357,14 +1841,18 @@ window.FinTrackerBankImport = (() => {
       );
 
 
-    $("#bank-import-file")
+    $(
+      "#bank-import-file"
+    )
       ?.addEventListener(
         "change",
         handleFile
       );
 
 
-    $("#bank-import-submit")
+    $(
+      "#bank-import-submit"
+    )
       ?.addEventListener(
         "click",
         handleImport
@@ -1374,12 +1862,16 @@ window.FinTrackerBankImport = (() => {
 
 
   function init() {
+
     createUI();
+
   }
 
 
   return {
+
     init
+
   };
 
 })();
