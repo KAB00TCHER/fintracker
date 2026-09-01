@@ -3714,31 +3714,19 @@ async function addQuickCategory(event) {
     mainId
   );
 
-} else if (newCategory) {
-
-  setValue(
-    "#transaction-category",
-    newCategory.id
-  );
-
-  renderTransactionCategoryChips(
-    newCategory.id
-  );
-
   refreshAllItemCategoryOptions();
 } else if (newCategory) {
 
-      setValue(
-        "#transaction-category",
-        newCategory.id
-      );
 
-      renderTransactionCategoryChips(
-        newCategory.id
-      );
+  populateTransactionCategories(
+    newCategory.id
+  );
 
-      refreshAllItemCategoryOptions();
-    }
+  handleMainCategoryChange(
+    newCategory.id
+  );
+
+}
 
     closeModal(
       "quick-category-modal"
