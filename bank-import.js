@@ -450,9 +450,7 @@ function prepare(operations) {
     return {
 
       type:
-        item.transfer
-          ? "expense"
-          : item.type,
+         item.type,
 
       amount:
         Math.abs(
