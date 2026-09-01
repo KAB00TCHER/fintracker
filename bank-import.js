@@ -650,21 +650,15 @@ window.FinTrackerBankImport = (() => {
        */
 
       const {
-        error
-      } =
-        await client
-          .from(
-            "transactions"
-          )
-          .upsert(
-            chunk,
-            {
-              onConflict:
-                "user_id,import_source,import_external_id",
-              ignoreDuplicates:
-                true
-            }
-          );
+  error
+} =
+  await client
+    .from(
+      "transactions"
+    )
+    .insert(
+      chunk
+    );
 
 
       if (
