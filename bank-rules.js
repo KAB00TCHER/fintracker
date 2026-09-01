@@ -425,47 +425,56 @@ window.FinTrackerBankRules = (() => {
   }
 
 
-  function isTransfer(row) {
+function isTransfer(row) {
 
-    const text =
-      normalizeSearchText(
-        `${row.description || ""} ${
-          row.bankCategory || ""
-        } ${
-          row.status || ""
-        }`
-      );
+  const text =
+    normalizeSearchText(
+      Object.values(row || {})
+        .filter(value =>
+          value !== null &&
+          value !== undefined
+        )
+        .join(" ")
+    );
 
-
-    if (
-      /внутрибанковск/.test(text) ||
-      /между счет/.test(text) ||
-      /межсчет/.test(text) ||
-      /между собственн/.test(text) ||
-      /между своими/.test(text) ||
-      /перевод между счет/.test(text)
-    ) {
-
-      return true;
-
-    }
-
-
-    /*
-     * СБП сама по себе не означает перевод
-     * между собственными счетами.
-     *
-     * Поэтому:
-     *
-     * "Перевод по СБП" ≠ автоматически transfer.
-     *
-     * Если это обычное поступление/отправление
-     * другому человеку, сохраняем как income/expense.
-     */
-
-    return false;
-
+  /*
+   * Явные банковские переводы
+   */
+  if (
+    /внутрибанковск/.test(text) ||
+    /между счет/.test(text) ||
+    /межсчет/.test(text) ||
+    /между собственн/.test(text) ||
+    /между своими/.test(text) ||
+    /перевод между счет/.test(text) ||
+    /со счета.*на счет/.test(text) ||
+    /со сч[её]та.*на сч[её]т/.test(text)
+  ) {
+    return true;
   }
+
+
+  /*
+   * Перевод между банковскими счетами.
+   *
+   * Если в описании присутствуют два
+   * 20-значных номера счёта — считаем
+   * операцию внутренним переводом.
+   */
+  const accounts =
+    text.match(
+      /\b\d{20}\b/g
+    ) || [];
+
+  if (
+    accounts.length >= 2
+  ) {
+    return true;
+  }
+
+
+  return false;
+}
 
 
   function detectType(row) {
