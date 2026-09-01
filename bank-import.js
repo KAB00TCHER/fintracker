@@ -918,19 +918,16 @@ function prepare(operations) {
 
                   <td>
 
-                   <input
+<input
   type="checkbox"
   data-import-index="${index}"
-
-  ${
-    item.selected
-      ? "checked"
-      : ""
-  }
-
+  ${item.selected ? "checked" : ""}
   ${
     item.duplicate ||
-    item.blocked
+    item.blocked ||
+    !item.date ||
+    !Number.isFinite(Number(item.amount)) ||
+    item.type === "unknown"
       ? "disabled"
       : ""
   }
