@@ -198,19 +198,7 @@ window.FinTrackerBankImport = (() => {
       );
 
 
-    if (
-      !category &&
-      operation.type ===
-        "expense"
-    ) {
 
-      category =
-        findCategory(
-          "Прочее",
-          "expense"
-        );
-
-    }
 
 
     return {
@@ -335,176 +323,124 @@ window.FinTrackerBankImport = (() => {
   }
 
 
-  function prepare(
-    operations
-  ) {
+function prepare(operations) {
+  const externalIds = new Set(
+    existingTransactions
+      .filter(transaction =>
+        transaction.import_source === IMPORT_SOURCE &&
+        transaction.import_external_id
+      )
+      .map(transaction =>
+        transaction.import_external_id
+      )
+  );
 
-    const externalIds =
-      new Set(
+  const fingerprintSet = new Set(
+    existingTransactions
+      .map(existingFingerprint)
+  );
 
-        existingTransactions
+  // Отдельный набор fingerprint'ов
+  // для операций внутри текущего Excel.
+  const importedFingerprintSet = new Set();
 
-          .filter(
-            transaction =>
+  const importedExternalIdSet = new Set();
 
-              transaction
-                .import_source ===
-                IMPORT_SOURCE &&
+  prepared = operations.map(operation => {
+    const item = classify(operation);
 
-              transaction
-                .import_external_id
-          )
+    const fingerprint =
+      R.makeFingerprint(item);
 
-          .map(
-            transaction =>
-              transaction
-                .import_external_id
-          )
+    const externalId =
+      R.extractOperationId(item);
 
+    const duplicateById =
+      Boolean(
+        externalId &&
+        (
+          externalIds.has(externalId) ||
+          importedExternalIdSet.has(externalId)
+        )
       );
 
-
-    const fingerprintSet =
-      new Set(
-
-        existingTransactions
-          .map(
-            existingFingerprint
-          )
-
+    const duplicateByFingerprint =
+      !externalId &&
+      (
+        fingerprintSet.has(fingerprint) ||
+        importedFingerprintSet.has(fingerprint)
       );
 
+    const duplicate =
+      duplicateById ||
+      duplicateByFingerprint;
 
-    prepared =
-      operations.map(
-        operation => {
+    // Запоминаем текущую операцию,
+    // чтобы следующая строка Excel
+    // могла быть распознана как дубль.
+    if (externalId) {
+      importedExternalIdSet.add(externalId);
+    }
 
-          const item =
-            classify(
-              operation
-            );
+    importedFingerprintSet.add(fingerprint);
 
+    const blocked =
+      Boolean(item.isHold);
 
-          const fingerprint =
-            R.makeFingerprint(
-              item
-            );
-
-
-          const externalId =
-            R.extractOperationId(
-              item
-            );
-
-
-          /*
-           * Сначала проверяем
-           * настоящий ID банка.
-           */
-
-          const duplicateById =
-            Boolean(
-              externalId &&
-              externalIds.has(
-                externalId
-              )
-            );
-
-
-          /*
-           * Если банковского ID нет,
-           * используем fingerprint.
-           */
-
-          const duplicateByFingerprint =
-            !externalId &&
-            fingerprintSet.has(
-              fingerprint
-            );
-
-
-          const duplicate =
-            duplicateById ||
-            duplicateByFingerprint;
-
-
-          const blocked =
-            Boolean(
-              item.isHold
-            );
-
-
-          const transfer =
-            Boolean(
-              item.isTransfer ||
-              item.type ===
-                "transfer"
-            );
-
-
-          const valid =
-            Boolean(
-
-              item.date &&
-
-              Number.isFinite(
-                Number(
-                  item.amount
-                )
-              ) &&
-
-              item.type !==
-                "unknown" &&
-
-              !blocked &&
-
-              (
-                transfer ||
-                item.categoryId
-              )
-
-            );
-
-
-          return {
-
-            ...item,
-
-            importSource:
-              IMPORT_SOURCE,
-
-            externalId,
-
-            fingerprint,
-
-            duplicate,
-
-            duplicateReason:
-              duplicateById
-                ? "Код операции уже импортирован"
-                : duplicateByFingerprint
-                  ? "Похожа на существующую операцию"
-                  : null,
-
-            blocked,
-
-            transfer,
-
-            selected:
-              !duplicate &&
-              !blocked,
-
-            valid
-
-          };
-
-        }
+    const transfer =
+      Boolean(
+        item.isTransfer ||
+        item.type === "transfer"
       );
 
+    const valid =
+      Boolean(
+        item.date &&
+        Number.isFinite(
+          Number(item.amount)
+        ) &&
+        item.type !== "unknown" &&
+        !blocked &&
+        (
+          transfer ||
+          item.categoryId
+        )
+      );
 
-    return prepared;
+    return {
+      ...item,
 
-  }
+      importSource:
+        IMPORT_SOURCE,
+
+      externalId,
+
+      fingerprint,
+
+      duplicate,
+
+      duplicateReason:
+        duplicateById
+          ? "Код операции уже импортирован"
+          : duplicateByFingerprint
+            ? "Такая операция уже есть"
+            : null,
+
+      blocked,
+
+      transfer,
+
+      selected:
+        !duplicate &&
+        !blocked &&
+        valid,
+
+      valid
+    };
+  });
+
+  return prepared;
+}
 
 
   function buildPayload(
@@ -982,25 +918,23 @@ window.FinTrackerBankImport = (() => {
 
                   <td>
 
-                    <input
-                      type="checkbox"
+                   <input
+  type="checkbox"
+  data-import-index="${index}"
 
-                      data-import-index="${index}"
+  ${
+    item.selected
+      ? "checked"
+      : ""
+  }
 
-                      ${
-                        item.selected
-                          ? "checked"
-                          : ""
-                      }
-
-                      ${
-                        item.duplicate ||
-                        item.blocked ||
-                        !item.valid
-                          ? "disabled"
-                          : ""
-                      }
-                    >
+  ${
+    item.duplicate ||
+    item.blocked
+      ? "disabled"
+      : ""
+  }
+>
 
                   </td>
 
@@ -1062,37 +996,36 @@ window.FinTrackerBankImport = (() => {
                   </td>
 
 
-                  <td>
+<td>
 
-                    ${
-                      item.transfer
+  ${
+    item.transfer
 
-                        ? "Не требуется"
+      ? "Не требуется"
 
-                        : item.blocked
+      : item.blocked
 
-                          ? "Проверить HOLD"
+        ? "Проверить HOLD"
 
-                          : item.valid
+        : `
 
-                            ? `
+          <select
+            class="bank-import-category"
+            data-import-category="${index}"
+          >
 
-                              <select
-                                data-import-category="${index}"
-                              >
+            <option value="">
+              Выберите категорию
+            </option>
 
-                                ${categoryOptions(
-                                  item
-                                )}
+            ${categoryOptions(item)}
 
-                              </select>
+          </select>
 
-                            `
+        `
+  }
 
-                            : "Нужно проверить"
-                    }
-
-                  </td>
+</td>
 
 
                   <td>
@@ -1861,12 +1794,80 @@ window.FinTrackerBankImport = (() => {
 
   }
 
+document.addEventListener(
+  "change",
+  event => {
 
+    const select =
+      event.target.closest(
+        "[data-import-category]"
+      );
+
+    if (!select) {
+      return;
+    }
+
+    const index =
+      Number(
+        select.dataset.importCategory
+      );
+
+    const item =
+      prepared[index];
+
+    if (!item) {
+      return;
+    }
+
+    const categoryId =
+      select.value || null;
+
+    const category =
+      categories.find(
+        category =>
+          category.id === categoryId
+      );
+
+    item.categoryId =
+      categoryId;
+
+    item.categoryName =
+      category?.name ||
+      "Без категории";
+
+    item.autoCategory =
+      false;
+
+    item.valid =
+      Boolean(
+        item.date &&
+        Number.isFinite(
+          Number(item.amount)
+        ) &&
+        item.type !== "unknown" &&
+        !item.blocked &&
+        (
+          item.transfer ||
+          item.categoryId
+        )
+      );
+
+    item.selected =
+      !item.duplicate &&
+      !item.blocked &&
+      item.valid;
+
+    renderPreview();
+
+  }
+);
   return {
 
     init
 
   };
+
+  
 
 })();
 
