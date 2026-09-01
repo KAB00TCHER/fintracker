@@ -24,13 +24,28 @@ window.FinTrackerExcelParser = (() => {
       "value date"
     ],
 
-    amount: [
-      "сумма",
-      "сумма операции",
-      "сумма операции в валюте счета",
-      "amount",
-      "transaction amount"
-    ],
+
+amount: [
+  "сумма",
+  "сумма операции",
+  "сумма операции в валюте счета",
+  "сумма операции в валюте операции",
+  "сумма в валюте счета",
+  "сумма в валюте операции",
+  "сумма списания",
+  "сумма зачисления",
+  "сумма платежа",
+  "сумма транзакции",
+  "сумма операции руб",
+  "сумма операции руб.",
+  "сумма, руб.",
+  "сумма руб",
+  "расход",
+  "amount",
+  "transaction amount"
+],
+
+
 
     description: [
       "описание",
@@ -150,6 +165,48 @@ window.FinTrackerExcelParser = (() => {
   }
 
 
+function findAmountColumn(headers) {
+  const exact = findColumn(
+    headers,
+    HEADER_ALIASES.amount
+  );
+
+  if (exact) {
+    return exact;
+  }
+
+  const normalized = headers.map(
+    normalizeHeader
+  );
+
+  const candidates = [
+    /\bсумм\w*\b.*\bоперац\w*\b/,
+    /\bсумм\w*\b.*\bсписан\w*\b/,
+    /\bсумм\w*\b.*\bзачислен\w*\b/,
+    /\bсумм\w*\b.*\bплатеж\w*\b/,
+    /\bсумм\w*\b.*\bтранзакц\w*\b/,
+    /\bсумм\w*\b.*\bруб\b/,
+    /\bрасход\b/,
+    /\bamount\b/,
+    /\btransaction\s+amount\b/
+  ];
+
+  for (const pattern of candidates) {
+    const index = normalized.findIndex(
+      value => pattern.test(value)
+    );
+
+    if (index !== -1) {
+      return headers[index];
+    }
+  }
+
+  return null;
+}
+
+
+
+
   function detectColumns(
     headers
   ) {
@@ -172,7 +229,7 @@ window.FinTrackerExcelParser = (() => {
 
     }
 
-
+    result.amount = findAmountColumn(headers);
     return result;
 
   }
